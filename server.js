@@ -9,59 +9,54 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const INSEE_API_URL = "https://api.insee.fr/entreprises/sirene/V3.11/siren";
-const INSEE_TOKEN_URL = "https://api.insee.fr/token";
+const TOKEN_URL = "https://api.insee.fr/token";
+const API_URL = "https://api.insee.fr/entreprises/sirene/V3.11/siret";
 const INSEE_KEY = process.env.INSEE_API_KEY;
 const INSEE_SECRET = process.env.INSEE_API_SECRET;
 
 let token = "";
-let tokenExpiry = 0; // Timestamp d'expiration du token
+let tokenExpiry = 0;
 
-// 🔑 Fonction pour récupérer un token OAuth
 const getToken = async () => {
-  try {
-    console.log("🔄 Récupération du token INSEE...");
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${INSEE_KEY}:${INSEE_SECRET}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
 
-    const response = await fetch(INSEE_TOKEN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(`${INSEE_KEY}:${INSEE_SECRET}`).toString("base64")}`,
-      },
-      body: "grant_type=client_credentials",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Erreur lors de l'obtention du token: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    token = data.access_token;
-    tokenExpiry = Date.now() + data.expires_in * 1000; // Stocker l'expiration en millisecondes
-
-    console.log("✅ Token INSEE récupéré avec succès !");
-  } catch (error) {
-    console.error("❌ Erreur lors de la récupération du token:", error.message);
+  if (!response.ok) {
+    throw new Error(`Erreur token INSEE: ${response.statusText}`);
   }
+
+  const data = await response.json();
+  token = data.access_token;
+  tokenExpiry = Date.now() + data.expires_in * 1000;
+  console.log("✅ Token INSEE mis à jour");
 };
 
-// 🔍 Vérifier si le token est toujours valide avant chaque requête
-const ensureValidToken = async () => {
+const ensureToken = async () => {
   if (!token || Date.now() >= tokenExpiry) {
-    console.log("⚠️ Token expiré ou inexistant, récupération d'un nouveau...");
+    console.log("🔄 Récupération du token INSEE...");
     await getToken();
   }
 };
 
-// 📌 Endpoint proxy pour récupérer des infos INSEE via un SIREN
-app.get("/api/insee/:siren", async (req, res) => {
+app.get("/api/insee-activite", async (req, res) => {
   try {
-    await ensureValidToken();
+    await ensureToken();
 
-    const { siren } = req.params;
-    const url = `${INSEE_API_URL}/${siren}`;
+    const { naf } = req.query;
+    if (!naf) {
+      return res.status(400).json({ error: "Paramètre 'naf' requis." });
+    }
 
-    console.log(`📡 Requête à l'INSEE: ${url}`);
+    const query = `activitePrincipaleEtablissement:${naf}`;
+    const url = `${API_URL}?q=${encodeURIComponent(query)}&nombre=1000`;
+
+    console.log("🔍 URL finale appelée à l'API INSEE :", url);
 
     const response = await fetch(url, {
       headers: {
@@ -70,40 +65,31 @@ app.get("/api/insee/:siren", async (req, res) => {
       },
     });
 
-    if (response.status === 401) {
-      console.log("🔄 Token invalide. Récupération d'un nouveau token...");
-      await getToken(); // Reprendre un nouveau token et réessayer
-      return res.redirect(`/api/insee/${siren}`);
-    }
-
     if (!response.ok) {
-      throw new Error(`❌ Erreur API INSEE: ${response.status} - ${response.statusText}`);
+      const errorText = await response.text();
+      console.error("💥 Erreur activité INSEE :", errorText);
+      throw new Error(`Erreur API INSEE: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    if (!data.uniteLegale) {
-      throw new Error("⚠️ Aucune donnée trouvée pour ce SIREN.");
-    }
+    const etablissements = data.etablissements || [];
 
-    const uniteLegale = data.uniteLegale;
-    const periodeActuelle = uniteLegale.periodesUniteLegale[0];
+    const formatted = etablissements
+      .filter((e) => e.coordonneesEtablissement)
+      .map((e) => ({
+        Nom: e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale || "Entreprise",
+        Latitude: parseFloat(e.coordonneesEtablissement.latitude),
+        Longitude: parseFloat(e.coordonneesEtablissement.longitude),
+        Type: "Recherche",
+      }));
 
-    const resultat = {
-      siren: uniteLegale.siren,
-      denomination: periodeActuelle.denominationUniteLegale,
-      activitePrincipale: periodeActuelle.activitePrincipaleUniteLegale,
-      etatAdministratif: periodeActuelle.etatAdministratifUniteLegale,
-      categorieJuridique: periodeActuelle.categorieJuridiqueUniteLegale,
-      derniereMiseAJour: uniteLegale.dateDernierTraitementUniteLegale,
-    };
-
-    console.log("✅ Données reçues:", resultat);
-    res.json(resultat);
+    res.json(formatted);
   } catch (error) {
-    console.error("💥 Erreur:", error.message);
+    console.error("💥 Erreur activité INSEE :", error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
+
 const PORT = 5000;
-app.listen(PORT, () => console.log(`🚀 Serveur proxy prêt sur http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Serveur en écoute sur http://localhost:${PORT}`));

@@ -13,16 +13,19 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.3",
+    "@turf/turf": "^7.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "js-file-download": "^0.4.12",
     "mapbox-gl": "^3.10.0",
+    "mapbox-gl-draw-circle": "^1.1.2",
     "node-fetch": "^3.3.2",
     "papaparse": "^5.5.2",
     "react": "^19.0.0",
     "react-csv": "^2.2.2",
     "react-dom": "^19.0.0",
+    "react-icons": "^5.5.0",
     "supabase": "^2.20.5"
   },
   "devDependencies": {
@@ -41,7 +44,6 @@
     "tailwindcss": "^4.0.17",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "^6.2.0",
-    "deploy": "gh-pages -d dist"
+    "vite": "^6.2.0"
   }
 }

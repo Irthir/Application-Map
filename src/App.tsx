@@ -1,9 +1,7 @@
+// App.tsx
 import { useState } from "react";
 import Map from "./components/Map";
-import Auth from "./components/Auth";
-import Filter from "./components/Filtre";
-import ImportCSV from "./components/Import";
-import SearchAPE from "./components/SearchAPE";
+import Sidebar from "./components/Sidebar";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./App.css";
 
@@ -15,89 +13,136 @@ interface DataPoint {
 }
 
 const App = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [data, setData] = useState<DataPoint[]>([]);
   const [filterRadius, setFilterRadius] = useState<number | null>(null);
-  const [inseeData, setInseeData] = useState<DataPoint | null>(null); // ✅ Correction ici
+  const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
+
+  const handleCenterMap = (lat: number, lon: number) => {
+    setMapCenter([lon, lat]);
+  };
+
+  const toggleMarkerVisibility = (nom: string) => {
+    setHiddenMarkers(prev =>
+      prev.includes(nom) ? prev.filter(n => n !== nom) : [...prev, nom]
+    );
+  };
 
   const handleSearchResults = async (data: any) => {
-    console.log("Résultats APE :", data);
-    if (data && data.siren) {
-      try {
-        const { latitude, longitude } = await geocodeAddress(data.denomination || "France");
-        if (!latitude || !longitude) throw new Error("Coordonnées invalides.");
-        
-        setInseeData({  // ✅ Correction ici : assigner un objet et non un tableau
-          Nom: data.denomination || "Nom inconnu",
-          Latitude: latitude,
-          Longitude: longitude,
-          Type: "Entreprise",
-        });
+    try {
+      const label = data.denomination || "Lieu non nommé";
+      const toGeocode = data.adresse || label;
+      const geoData = await geocodeAddress(toGeocode);
 
-      } catch (error) {
-        console.error("Erreur de géocodage :", error);
-        alert("Impossible de localiser cette entreprise sur la carte.");
-        setInseeData(null); // ✅ Correction ici (remettre à null)
+      if (geoData.latitude && geoData.longitude) {
+        const newEntry = {
+          Nom: label,
+          Latitude: geoData.latitude,
+          Longitude: geoData.longitude,
+          Type: "Recherche",
+        };
+
+        setData(prev => [...prev, newEntry]);
+        centerMap(geoData.latitude, geoData.longitude);
+      } else {
+        alert("Aucune donnée géographique trouvée.");
       }
+    } catch (error) {
+      console.error("Erreur de géocodage ou récupération :", error);
+      alert("Entreprise non localisée.");
     }
+  };
+
+  const centerMap = (lat: number, lng: number) => {
+    setMapCenter([lng, lat]);
+  };
+
+  const handleSetType = (nom: string, type: "Client" | "Prospect" | "") => {
+    setData(prev =>
+      prev.map(item =>
+        item.Nom === nom ? { ...item, Type: type } : item
+      )
+    );
+  };
+
+  const handleRemoveItem = (nom: string) => {
+    setData(prev => prev.filter(item => item.Nom !== nom));
+  };
+
+  const handleExport = () => {
+    const markedData = data.filter(d => d.Type === "Client" || d.Type === "Prospect");
+    if (markedData.length === 0) {
+      alert("Aucune donnée marquée à exporter.");
+      return;
+    }
+
+    const csvContent = [
+      ["Nom", "Latitude", "Longitude", "Type"],
+      ...markedData.map(({ Nom, Latitude, Longitude, Type }) => [
+        Nom, Latitude.toString(), Longitude.toString(), Type,
+      ]),
+    ]
+      .map(row => row.join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "export_donnees.csv");
+    link.click();
   };
 
   const geocodeAddress = async (address: string) => {
-    try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
-      const data = await response.json();
-      if (data.length === 0) throw new Error("Adresse non trouvée");
-      return { latitude: parseFloat(data[0].lat), longitude: parseFloat(data[0].lon) };
-    } catch (error) {
-      console.error("Erreur lors du géocodage :", error);
-      throw error;
-    }
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    if (!data.length) throw new Error("Adresse non trouvée");
+    return {
+      latitude: parseFloat(data[0].lat),
+      longitude: parseFloat(data[0].lon),
+    };
   };
 
   const handleUpload = (uploadedData: any[]) => {
-    const formattedData = uploadedData.map((item) => ({
+    const formatted = uploadedData.map((item) => ({
       Nom: item.Nom,
       Latitude: parseFloat(item.Latitude),
       Longitude: parseFloat(item.Longitude),
       Type: item.Type,
     }));
-    setData(formattedData);
+    setData(formatted);
   };
 
   const handleFilter = (radius: number) => {
     setFilterRadius(radius);
   };
 
-  const handleLoginSuccess = () => {
-    setIsLoggedIn(true);
-  };
-
   return (
-    <div className="p-4 space-y-4">
-      {!isLoggedIn ? (
-        <div>
-          <h2>Connexion</h2>
-          <Auth />
-          <button onClick={handleLoginSuccess} className="mt-2 p-2 bg-blue-500 text-white rounded">Simuler Connexion</button>
-        </div>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <div><h2>Importer des données</h2><ImportCSV onUpload={handleUpload} /></div>
-          <div><h2>Filtrer les données</h2><Filter onFilter={handleFilter} /></div>
-          <div><h2>Recherche APE</h2><SearchAPE onResults={handleSearchResults} /></div>
-          <div>
-            <h2>Données Importées</h2>
-            <ul>{data.map((item, index) => (
-              <li key={index}>{item.Nom} - {item.Type} ({item.Latitude}, {item.Longitude})</li>
-            ))}</ul>
-          </div>
-          <div>
-            <h2>Carte</h2>
-            <Map data={[...data, ...(inseeData ? [inseeData] : [])]} filterRadius={filterRadius} /> {/* ✅ Correction ici */}
-          </div>
-        </>
-      )}
+    <div className="app-container">
+      <Sidebar
+  data={data}
+  onUpload={handleUpload}
+  onFilter={handleFilter}
+  onSearchResults={handleSearchResults}
+  onCenter={handleCenterMap}
+  onToggleVisibility={toggleMarkerVisibility}
+  hiddenMarkers={hiddenMarkers}
+  onSetType={handleSetType}
+  onExport={handleExport}
+  onRemoveItem={handleRemoveItem}
+  mapCenter={mapCenter}
+  filterRadius={filterRadius}
+  setFilterRadius={setFilterRadius}
+/>
+
+
+      <main className="map-container">
+        <Map
+          data={data.filter(item => !hiddenMarkers.includes(item.Nom))}
+          filterRadius={filterRadius}
+          center={mapCenter}
+        />
+      </main>
     </div>
   );
 };
