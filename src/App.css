@@ -54,3 +54,16 @@ html, body, #root {
   border-radius: 5px;
   text-align: center;
 }
+
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 100vh; /* pour s'assurer que la carte prend toute la hauteur */
+}
+
+.import-button-overlay {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 999;
+}

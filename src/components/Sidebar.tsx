@@ -1,4 +1,4 @@
-import ImportCSV from "./Import";
+//import ImportCSV from "./Import";
 //import Filter from "./Filtre";
 import SearchAPE from "./SearchAPE";
 import FiltreINSEEHierarchique from "./FiltreINSEEHiérarchique";
@@ -29,7 +29,7 @@ interface SidebarProps {
 
 const Sidebar = ({
   data,
-  onUpload,
+  //onUpload,
   onFilter,
   onSearchResults,
   onCenter,
@@ -51,24 +51,13 @@ const Sidebar = ({
     <aside className="sidebar">
       <h1 className="text-2xl font-bold mb-4">Application Map</h1>
 
-      <section>
+      {/*<section className="mt-4">
         <h2 className="font-semibold mb-2">Importer des données</h2>
         <ImportCSV onUpload={onUpload} />
-      </section>
-
-      
-      <section className="mt-4">
-      <h2 className="font-semibold mb-2">Exporter les données</h2>
-        <button
-          onClick={onExport}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-        >
-          Exporter les données en CSV
-        </button>
-      </section>
+      </section>*/}
 
       <section>
-        <h2 className="font-semibold mb-2">Recherche APE</h2>
+        <h2 className="font-semibold mb-2">Recherche</h2>
         <SearchAPE onResults={onSearchResults} />
         <FiltreINSEEHierarchique
           center={mapCenter}
@@ -141,6 +130,18 @@ const Sidebar = ({
             </li>
           ))}
         </ul>
+      </section>
+
+      
+      
+      <section className="mt-4">
+      <h2 className="font-semibold mb-2">Exporter les données</h2>
+        <button
+          onClick={onExport}
+          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+        >
+          Exporter les données en CSV
+        </button>
       </section>
     </aside>
   );

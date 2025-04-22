@@ -4,6 +4,7 @@ import Map from "./components/Map";
 import Sidebar from "./components/Sidebar";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./App.css";
+import ImportCSV from "./components/Import";
 
 interface DataPoint {
   Nom: string;
@@ -29,9 +30,20 @@ const App = () => {
   };
 
   const handleSearchResults = async (data: any) => {
-    try {
-      const label = data.denomination || "Lieu non nommé";
-      const toGeocode = data.adresse || label;
+    try { 
+      const label = data.denomination || "";
+      const address = data.adresse || label; // Aide à la géolocalisation
+
+      if (!address || address.trim() === "") {
+        alert("Aucune adresse à géocoder.");
+        return;
+      }
+
+      const toGeocode = `${address}, France`;
+      console.log("Adresse envoyée au géocodeur :", toGeocode);
+
+      console.log("Adresse envoyée au géocodeur :", toGeocode); // Pour debug
+
       const geoData = await geocodeAddress(toGeocode);
 
       if (geoData.latitude && geoData.longitude) {
@@ -94,9 +106,24 @@ const App = () => {
   };
 
   const geocodeAddress = async (address: string) => {
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'MaSuperApp/1.0 (contact@exemple.com)', // remplace par ton mail ou nom
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erreur réseau : ${res.status}`);
+    }
+
     const data = await res.json();
-    if (!data.length) throw new Error("Adresse non trouvée");
+
+    if (!data || data.length === 0) {
+      console.warn("Adresse non trouvée :", address);
+      throw new Error("Adresse non trouvée");
+    }
+
     return {
       latitude: parseFloat(data[0].lat),
       longitude: parseFloat(data[0].lon),
@@ -120,21 +147,20 @@ const App = () => {
   return (
     <div className="app-container">
       <Sidebar
-  data={data}
-  onUpload={handleUpload}
-  onFilter={handleFilter}
-  onSearchResults={handleSearchResults}
-  onCenter={handleCenterMap}
-  onToggleVisibility={toggleMarkerVisibility}
-  hiddenMarkers={hiddenMarkers}
-  onSetType={handleSetType}
-  onExport={handleExport}
-  onRemoveItem={handleRemoveItem}
-  mapCenter={mapCenter}
-  filterRadius={filterRadius}
-  setFilterRadius={setFilterRadius}
-/>
-
+        data={data}
+        onUpload={handleUpload}
+        onFilter={handleFilter}
+        onSearchResults={handleSearchResults}
+        onCenter={handleCenterMap}
+        onToggleVisibility={toggleMarkerVisibility}
+        hiddenMarkers={hiddenMarkers}
+        onSetType={handleSetType}
+        onExport={handleExport}
+        onRemoveItem={handleRemoveItem}
+        mapCenter={mapCenter}
+        filterRadius={filterRadius}
+        setFilterRadius={setFilterRadius}
+      />
 
       <main className="map-container">
         <Map
@@ -142,6 +168,10 @@ const App = () => {
           filterRadius={filterRadius}
           center={mapCenter}
         />
+
+        <div className="import-button-overlay">
+          <ImportCSV onUpload={handleUpload} />
+        </div>
       </main>
     </div>
   );

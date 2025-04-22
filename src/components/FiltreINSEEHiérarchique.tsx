@@ -13,9 +13,15 @@ interface Props {
   onRadiusChange: (radius: number) => void;
 }
 
-const FiltreINSEEHierarchique: React.FC<Props> = ({ center, onSearchResults, radius, onRadiusChange }) => {
+const FiltreINSEEHierarchique: React.FC<Props> = ({
+  center,
+  onSearchResults,
+  radius,
+  onRadiusChange,
+}) => {
   const [nafList, setNafList] = useState<NafCode[]>([]);
   const [selectedNaf, setSelectedNaf] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const filtered = nafCodes.filter((code) => code.id.includes("."));
@@ -24,47 +30,37 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({ center, onSearchResults, rad
 
   const handleSearch = async () => {
     if (!selectedNaf) return;
+    const [lng, lat] = center;
+
+    setLoading(true);
+    console.log(`🔍 Recherche secteur ${selectedNaf} à la position: ${lat}, ${lng}`);
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/insee-activite?naf=${selectedNaf}`
+        `http://localhost:5000/api/insee-activite?naf=${encodeURIComponent(
+          selectedNaf
+        )}&lat=${lat}&lng=${lng}&radius=${radius}`
       );
 
       if (!res.ok) throw new Error("Erreur lors de la récupération des données INSEE");
-
       const data = await res.json();
 
-      const [lng, lat] = center;
+      if (data.length === 0) {
+        alert("Aucun établissement trouvé. Essayez d'élargir le rayon ou de changer de secteur.");
+      }
 
-      const results = data
-        .map((item: any) => {
-          const distance = haversineDistance(lat, lng, item.Latitude, item.Longitude);
-          return { ...item, distance };
-        })
-        .filter((item: any) => item.distance <= radius);
-
-      onSearchResults(results);
+      onSearchResults(data);
     } catch (error) {
       console.error("Erreur INSEE :", error);
       alert("Impossible de récupérer les données INSEE.");
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const toRad = (x: number) => (x * Math.PI) / 180;
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLon = toRad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">Filtrer par activité (NAF)</h3>
+      <h3 className="font-semibold mb-2">Filtrer par industrie</h3>
 
       <select
         value={selectedNaf}
@@ -73,29 +69,30 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({ center, onSearchResults, rad
       >
         <option value="">Sélectionner un secteur</option>
         {nafList.map((c) => (
-          <option key={c.id} value={c.id.replace(".", "")}>
+          <option key={c.id} value={c.id}>
             {c.id} - {c.label}
           </option>
         ))}
       </select>
 
       <label className="block mb-2 text-sm font-medium text-gray-700">
-        Rayon de recherche : {radius ?? 0} km
+        Rayon de recherche : {radius} km
       </label>
       <input
         type="range"
         min="1"
         max="50"
-        value={radius ?? 0}
+        value={radius}
         onChange={(e) => onRadiusChange(Number(e.target.value))}
         className="w-full mb-4"
       />
 
       <button
         onClick={handleSearch}
-        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700"
+        disabled={loading}
+        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
       >
-        Rechercher
+        {loading ? "Recherche..." : "Rechercher"}
       </button>
     </div>
   );
