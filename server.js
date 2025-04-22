@@ -19,7 +19,6 @@ const INSEE_SECRET = process.env.INSEE_API_SECRET;
 let token = "";
 let tokenExpiry = 0;
 
-// 📦 Charger les codes postaux avec coordonnées WGS84
 const codePostalData = JSON.parse(fs.readFileSync("./src/data/code-postaux.json", "utf-8"));
 
 const getToken = async () => {
@@ -77,7 +76,8 @@ app.get("/api/insee-activite", async (req, res) => {
     let start = 0;
     let total = 0;
 
-    do {
+    // Nouvelle logique de pagination sans limite arbitraire
+    while (start < 10000) {
       const url = `${API_URL}?q=${encodeURIComponent(query)}&nombre=${pageSize}&debut=${start}`;
       console.log("🔍 URL appelée :", url);
 
@@ -96,11 +96,12 @@ app.get("/api/insee-activite", async (req, res) => {
       const data = await response.json();
       const etablissements = data.etablissements || [];
       total = data.header?.total || etablissements.length;
+
       allEtablissements = allEtablissements.concat(etablissements);
       start += pageSize;
-    } while (start < total && start < 10000);
 
-    //console.log(JSON.stringify(allEtablissements[0], null, 2));
+      if (etablissements.length < pageSize) break; // Fin des résultats
+    }
 
     const filtered = allEtablissements
       .map((e) => {
@@ -119,7 +120,7 @@ app.get("/api/insee-activite", async (req, res) => {
         }
 
         const distance = haversineDistance(latNum, lngNum, latWGS, lonWGS);
-        if ((distance > radiusNum) || isNaN(distance) || distance=="NaN") return null;
+        if ((distance > radiusNum) || isNaN(distance)) return null;
 
         return {
           Nom: e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale || "Entreprise",
@@ -128,10 +129,10 @@ app.get("/api/insee-activite", async (req, res) => {
           CodeCommune: e.adresseEtablissement.codeCommuneEtablissement,
           Type: "Recherche",
           Distance: distance.toFixed(2),
-          adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`
-        };        
+          adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`.trim()
+        };
       })
-      .filter(Boolean); // Supprimer les null
+      .filter(Boolean);
 
     res.json(filtered);
   } catch (error) {

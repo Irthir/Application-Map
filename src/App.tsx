@@ -1,5 +1,5 @@
 // App.tsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Map from "./components/Map";
 import Sidebar from "./components/Sidebar";
 import "mapbox-gl/dist/mapbox-gl.css";
@@ -18,6 +18,43 @@ const App = () => {
   const [filterRadius, setFilterRadius] = useState<number | null>(null);
   const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (unsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "Vous avez des modifications non sauvegardées.";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [unsavedChanges]);
+
+  useEffect(() => {
+    const listener = async (e: any) => {
+      const selected = data.find(d => d.Nom === e.detail);
+      if (selected) {
+        const nafCode = prompt("Code NAF à rechercher ? (par ex : 62.01Z)", "62.01Z");
+        if (!nafCode) return;
+
+        try {
+          const res = await fetch(
+            `http://localhost:5000/api/insee-activite?naf=${encodeURIComponent(
+              nafCode
+            )}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
+          );
+          const entreprises = await res.json();
+          handleSearchResults(entreprises);
+        } catch (err) {
+          console.error("Erreur lors de la recherche similaire :", err);
+        }
+      }
+    };
+    window.addEventListener("search-similar", listener);
+    return () => window.removeEventListener("search-similar", listener);
+  }, [data, filterRadius]);
 
   const handleCenterMap = (lat: number, lon: number) => {
     setMapCenter([lon, lat]);
@@ -29,22 +66,26 @@ const App = () => {
     );
   };
 
+  const removeRechercheMarkers = () => {
+    setData(prev => prev.filter(item => item.Type !== "Recherche"));
+  };
+
   const handleSearchResults = async (results: any[]) => {
+    removeRechercheMarkers();
+
     for (const data of results) {
       try {
         const label = data.Nom || "Entreprise";
         const address = data.adresse;
-  
+
         if (!address || address.trim() === "") {
           console.warn("❌ Aucune adresse à géocoder :", data);
           continue;
         }
-  
+
         const toGeocode = `${address}, France`;
-        console.log("📫 Adresse envoyée au géocodeur :", toGeocode);
-  
         const geoData = await geocodeAddress(toGeocode);
-  
+
         if (geoData.latitude && geoData.longitude) {
           const newEntry = {
             Nom: label,
@@ -52,27 +93,20 @@ const App = () => {
             Longitude: geoData.longitude,
             Type: "Recherche",
           };
-  
+
           setData(prev => [...prev, newEntry]);
-        } else {
-          console.warn("⚠️ Aucune donnée géographique trouvée pour :", address);
+          setUnsavedChanges(true);
         }
       } catch (error) {
-        console.error("💥 Erreur de géocodage :", error);
+        console.error("Erreur de géocodage ou récupération :", error);
       }
     }
-  
-    // Optionnel : recenter la carte sur le 1er résultat
+
     if (results.length > 0) {
       const first = results[0];
       const geoData = await geocodeAddress(`${first.adresse}, France`);
-      centerMap(geoData.latitude, geoData.longitude);
+      setMapCenter([geoData.longitude, geoData.latitude]);
     }
-  };
-  
-
-  const centerMap = (lat: number, lng: number) => {
-    setMapCenter([lng, lat]);
   };
 
   const handleSetType = (nom: string, type: "Client" | "Prospect" | "") => {
@@ -81,10 +115,12 @@ const App = () => {
         item.Nom === nom ? { ...item, Type: type } : item
       )
     );
+    setUnsavedChanges(true);
   };
 
   const handleRemoveItem = (nom: string) => {
     setData(prev => prev.filter(item => item.Nom !== nom));
+    setUnsavedChanges(true);
   };
 
   const handleExport = () => {
@@ -109,13 +145,15 @@ const App = () => {
     link.setAttribute("href", url);
     link.setAttribute("download", "export_donnees.csv");
     link.click();
+
+    setUnsavedChanges(false);
   };
 
   const geocodeAddress = async (address: string) => {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'MaSuperApp/1.0 (contact@exemple.com)', // remplace par ton mail ou nom
+        'User-Agent': 'MaSuperApp/1.0 (contact@exemple.com)',
       }
     });
 
@@ -126,7 +164,6 @@ const App = () => {
     const data = await res.json();
 
     if (!data || data.length === 0) {
-      console.warn("Adresse non trouvée :", address);
       throw new Error("Adresse non trouvée");
     }
 
@@ -144,6 +181,7 @@ const App = () => {
       Type: item.Type,
     }));
     setData(formatted);
+    setUnsavedChanges(false);
   };
 
   const handleFilter = (radius: number) => {
@@ -166,6 +204,7 @@ const App = () => {
         mapCenter={mapCenter}
         filterRadius={filterRadius}
         setFilterRadius={setFilterRadius}
+        onClearRecherche={removeRechercheMarkers}
       />
 
       <main className="map-container">
@@ -173,6 +212,7 @@ const App = () => {
           data={data.filter(item => !hiddenMarkers.includes(item.Nom))}
           filterRadius={filterRadius}
           center={mapCenter}
+          onClickSetCenter={(lat, lng) => setMapCenter([lng, lat])}
         />
 
         <div className="import-button-overlay">

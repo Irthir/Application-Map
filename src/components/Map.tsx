@@ -1,3 +1,4 @@
+// Map.tsx
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import * as turf from "@turf/turf";
@@ -8,9 +9,10 @@ interface MapProps {
   data: { Nom: string; Latitude: number; Longitude: number; Type: string }[];
   filterRadius: number | null;
   center: [number, number];
+  onClickSetCenter: (lat: number, lng: number) => void;
 }
 
-const Map: React.FC<MapProps> = ({ data, filterRadius, center }) => {
+const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCenter }) => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -21,8 +23,17 @@ const Map: React.FC<MapProps> = ({ data, filterRadius, center }) => {
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v11",
-      center: [2.35, 48.85],
+      center: center,
       zoom: 12,
+    });
+
+    map.current.on("click", (e) => {
+      const features = map.current?.queryRenderedFeatures(e.point);
+      const popupOpen = document.querySelector(".mapboxgl-popup") !== null;
+      if (popupOpen || features?.some(f => f.layer?.id.includes("marker"))) return;
+
+      const { lng, lat } = e.lngLat;
+      onClickSetCenter(lat, lng);
     });
 
     return () => map.current?.remove();
@@ -41,11 +52,9 @@ const Map: React.FC<MapProps> = ({ data, filterRadius, center }) => {
   useEffect(() => {
     if (!map.current) return;
 
-    // Supprimer les anciens marqueurs
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    // Ajouter les nouveaux marqueurs
     data.forEach((item) => {
       let color;
       switch (item.Type) {
@@ -65,53 +74,56 @@ const Map: React.FC<MapProps> = ({ data, filterRadius, center }) => {
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<div class="popup-content">
               <strong>${item.Nom}</strong><br>
-              Type: ${item.Type || "Non marqué"}
+              Type: ${item.Type || "Non marqué"}<br>
+              <button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: '${item.Nom}' }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>
             </div>`
           )
         )
+        .on("click", () => onClickSetCenter(item.Latitude, item.Longitude))
         .addTo(map.current!);
 
       markersRef.current.push(marker);
     });
   }, [data]);
 
-  // Ajouter ou mettre à jour le cercle de rayon
   useEffect(() => {
-    if (!map.current || !filterRadius || !center) return;
-
-    const circleId = "search-radius-circle";
-
-    // Supprimer le cercle existant s'il existe
-    if (map.current.getLayer(circleId)) {
-      map.current.removeLayer(circleId);
+    if (!map.current || !center) return;
+  
+    const addCircleLayer = () => {
+      const circleId = "search-radius-circle";
+  
+      if (map.current!.getLayer(circleId)) map.current!.removeLayer(circleId);
+      if (map.current!.getSource(circleId)) map.current!.removeSource(circleId);
+  
+      const circle = turf.circle(center, filterRadius || 5, {
+        steps: 64,
+        units: "kilometers",
+      });
+  
+      map.current!.addSource(circleId, {
+        type: "geojson",
+        data: circle,
+      });
+  
+      map.current!.addLayer({
+        id: circleId,
+        type: "fill",
+        source: circleId,
+        layout: {},
+        paint: {
+          "fill-color": "#1D4ED8",
+          "fill-opacity": 0.2,
+        },
+      });
+    };
+  
+    if (map.current.isStyleLoaded()) {
+      addCircleLayer();
+    } else {
+      map.current.once("style.load", addCircleLayer);
     }
-    if (map.current.getSource(circleId)) {
-      map.current.removeSource(circleId);
-    }
-
-    // Créer un cercle GeoJSON avec Turf.js
-    const circle = turf.circle(center, filterRadius, {
-      steps: 64,
-      units: "kilometers",
-    });
-
-    // Ajouter la source et la couche pour le cercle
-    map.current.addSource(circleId, {
-      type: "geojson",
-      data: circle,
-    });
-
-    map.current.addLayer({
-      id: circleId,
-      type: "fill",
-      source: circleId,
-      layout: {},
-      paint: {
-        "fill-color": "#1D4ED8",
-        "fill-opacity": 0.2,
-      },
-    });
-  }, [filterRadius, center]);
+  }, [center, filterRadius]);
+  
 
   return <div ref={mapContainer} className="mapbox-container" />;
 };
