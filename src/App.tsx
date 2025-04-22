@@ -29,41 +29,47 @@ const App = () => {
     );
   };
 
-  const handleSearchResults = async (data: any) => {
-    try { 
-      const label = data.denomination || "";
-      const address = data.adresse || label; // Aide à la géolocalisation
-
-      if (!address || address.trim() === "") {
-        alert("Aucune adresse à géocoder.");
-        return;
+  const handleSearchResults = async (results: any[]) => {
+    for (const data of results) {
+      try {
+        const label = data.Nom || "Entreprise";
+        const address = data.adresse;
+  
+        if (!address || address.trim() === "") {
+          console.warn("❌ Aucune adresse à géocoder :", data);
+          continue;
+        }
+  
+        const toGeocode = `${address}, France`;
+        console.log("📫 Adresse envoyée au géocodeur :", toGeocode);
+  
+        const geoData = await geocodeAddress(toGeocode);
+  
+        if (geoData.latitude && geoData.longitude) {
+          const newEntry = {
+            Nom: label,
+            Latitude: geoData.latitude,
+            Longitude: geoData.longitude,
+            Type: "Recherche",
+          };
+  
+          setData(prev => [...prev, newEntry]);
+        } else {
+          console.warn("⚠️ Aucune donnée géographique trouvée pour :", address);
+        }
+      } catch (error) {
+        console.error("💥 Erreur de géocodage :", error);
       }
-
-      const toGeocode = `${address}, France`;
-      console.log("Adresse envoyée au géocodeur :", toGeocode);
-
-      console.log("Adresse envoyée au géocodeur :", toGeocode); // Pour debug
-
-      const geoData = await geocodeAddress(toGeocode);
-
-      if (geoData.latitude && geoData.longitude) {
-        const newEntry = {
-          Nom: label,
-          Latitude: geoData.latitude,
-          Longitude: geoData.longitude,
-          Type: "Recherche",
-        };
-
-        setData(prev => [...prev, newEntry]);
-        centerMap(geoData.latitude, geoData.longitude);
-      } else {
-        alert("Aucune donnée géographique trouvée.");
-      }
-    } catch (error) {
-      console.error("Erreur de géocodage ou récupération :", error);
-      alert("Entreprise non localisée.");
+    }
+  
+    // Optionnel : recenter la carte sur le 1er résultat
+    if (results.length > 0) {
+      const first = results[0];
+      const geoData = await geocodeAddress(`${first.adresse}, France`);
+      centerMap(geoData.latitude, geoData.longitude);
     }
   };
+  
 
   const centerMap = (lat: number, lng: number) => {
     setMapCenter([lng, lat]);

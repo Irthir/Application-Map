@@ -119,19 +119,17 @@ app.get("/api/insee-activite", async (req, res) => {
         }
 
         const distance = haversineDistance(latNum, lngNum, latWGS, lonWGS);
-        //if (distance > radiusNum) return null;
+        if ((distance > radiusNum) || isNaN(distance) || distance=="NaN") return null;
 
         return {
-          Nom:
-            e.uniteLegale?.denominationUniteLegale ||
-            e.uniteLegale?.nomUniteLegale ||
-            "Entreprise",
+          Nom: e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale || "Entreprise",
           CodePostal: e.adresseEtablissement.codePostalEtablissement,
           Commune: e.adresseEtablissement.libelleCommuneEtablissement || "Commune inconnue",
           CodeCommune: e.adresseEtablissement.codeCommuneEtablissement,
           Type: "Recherche",
           Distance: distance.toFixed(2),
-        };
+          adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`
+        };        
       })
       .filter(Boolean); // Supprimer les null
 
