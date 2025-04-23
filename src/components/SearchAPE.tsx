@@ -15,11 +15,14 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
       const data = await response.json();
 
       if (data && data.denomination) {
-        onResults({
-          denomination: data.denomination,
-          adresse: data.adresse,
-          siren: input,
-        });
+        onResults([
+          {
+            Nom: data.denomination,
+            Latitude: data.adresse?.coordonnees?.latitude ?? 0,
+            Longitude: data.adresse?.coordonnees?.longitude ?? 0,
+            Type: "Recherche",
+          },
+        ]);
       } else {
         alert("Entreprise non trouvée.");
       }
@@ -32,12 +35,14 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
 
         if (geoData.length > 0) {
           const firstResult = geoData[0];
-          onResults({
-            denomination: input,
-            latitude: firstResult.lat,
-            longitude: firstResult.lon,
-            siren: null,
-          });
+          onResults([
+            {
+              Nom: input,
+              Latitude: parseFloat(firstResult.lat),
+              Longitude: parseFloat(firstResult.lon),
+              Type: "Recherche",
+            },
+          ]);          
         } else {
           alert("Adresse ou nom d’entreprise non trouvée.");
         }

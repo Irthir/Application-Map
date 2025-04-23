@@ -72,42 +72,48 @@ const App = () => {
 
   const handleSearchResults = async (results: any[]) => {
     removeRechercheMarkers();
-
-    for (const data of results) {
+  
+    const newEntries: DataPoint[] = [];
+  
+    for (const entry of results) {
       try {
-        const label = data.Nom || "Entreprise";
-        const address = data.adresse;
-
-        if (!address || address.trim() === "") {
-          console.warn("❌ Aucune adresse à géocoder :", data);
-          continue;
-        }
-
-        const toGeocode = `${address}, France`;
-        const geoData = await geocodeAddress(toGeocode);
-
-        if (geoData.latitude && geoData.longitude) {
-          const newEntry = {
-            Nom: label,
+        const nom = entry.Nom || "Entreprise";
+        const hasCoords = typeof entry.Latitude === "number" && typeof entry.Longitude === "number";
+  
+        if (hasCoords) {
+          // On a déjà des coordonnées => on les utilise
+          newEntries.push({
+            Nom: nom,
+            Latitude: entry.Latitude,
+            Longitude: entry.Longitude,
+            Type: entry.Type || "Recherche",
+          });
+        } else if (entry.adresse && entry.adresse.trim() !== "") {
+          // Pas de coordonnées => géocodage de l'adresse
+          const geoData = await geocodeAddress(`${entry.adresse}, France`);
+          newEntries.push({
+            Nom: nom,
             Latitude: geoData.latitude,
             Longitude: geoData.longitude,
             Type: "Recherche",
-          };
-
-          setData(prev => [...prev, newEntry]);
-          setUnsavedChanges(true);
+          });
+        } else {
+          console.warn("❌ Donnée sans coordonnées ni adresse :", entry);
         }
       } catch (error) {
-        console.error("Erreur de géocodage ou récupération :", error);
+        console.error("Erreur lors du traitement d’un résultat :", error);
       }
     }
-
-    if (results.length > 0) {
-      const first = results[0];
-      const geoData = await geocodeAddress(`${first.adresse}, France`);
-      setMapCenter([geoData.longitude, geoData.latitude]);
+  
+    if (newEntries.length > 0) {
+      setData(prev => [...prev, ...newEntries]);
+      setMapCenter([newEntries[0].Longitude, newEntries[0].Latitude]);
+      setUnsavedChanges(true);
+    } else {
+      alert("Aucune donnée valide à afficher.");
     }
   };
+  
 
   const handleSetType = (nom: string, type: "Client" | "Prospect" | "") => {
     setData(prev =>
