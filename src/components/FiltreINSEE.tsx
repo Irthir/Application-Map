@@ -10,37 +10,40 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
   const [selectedNaf, setSelectedNaf] = useState("");
   const [radius, setRadius] = useState(5); // en km
 
+  const isDev = import.meta.env.DEV;
+  const baseUrl = isDev ? "http://localhost:5000" : "https://application-map.onrender.com";
+
   const handleSearch = async () => {
     if (!selectedNaf) return;
 
     const [lon, lat] = center;
 
-    // Construire l'appel API vers Entreprise.data.gouv.fr ou API entreprise INSEE
-    // Par exemple avec geoapify, entreprise.data.gouv, ou un back perso (tu peux mocker ici)
-    const res = await fetch(
-      `https://entreprise.data.gouv.fr/api/sirene/v3/etablissements?activite_principale=${selectedNaf}&latitude=${lat}&longitude=${lon}&distance=${radius * 1000}`
-    );
-    const json = await res.json();
+    try {
+      const res = await fetch(
+        `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(
+          selectedNaf
+        )}&lat=${lat}&lng=${lon}&radius=${radius}`
+      );
 
-    const result = json.etablissements
-    .filter((e: any) => e.geo?.latitude && e.geo?.longitude)
-    .map((e: any) => ({
-        Nom: e.nom_raison_sociale || e.unite_legale?.denomination || "Entreprise",
-        Latitude: parseFloat(e.geo.latitude),
-        Longitude: parseFloat(e.geo.longitude),
+      if (!res.ok) throw new Error("Erreur lors de la récupération des données INSEE");
+
+      const data = await res.json();
+      const result = data.map((e: any) => ({
+        Nom: e.Nom,
+        Latitude: e.latitude ?? e.lat ?? 0,
+        Longitude: e.longitude ?? e.lon ?? 0,
         Type: "Recherche",
-    }));
+      }));
 
-    if (result.length > 0) {
-        //const first = result[0];
-        onSearchResults(result);
-      }      
-
-    if (result.length === 0) {
+      if (result.length === 0) {
         alert("Aucune entreprise trouvée pour ce code APE et ce rayon.");
       }
 
-    onSearchResults(result);
+      onSearchResults(result);
+    } catch (error) {
+      console.error("Erreur INSEE :", error);
+      alert("Erreur lors de la récupération des données INSEE.");
+    }
   };
 
   return (

@@ -23,6 +23,9 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const [selectedNaf, setSelectedNaf] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
+  const isDev = import.meta.env.DEV;
+  const baseUrl = isDev ? "http://localhost:5000" : "https://application-map.onrender.com";
+
   useEffect(() => {
     const filtered = nafCodes.filter((code) => code.id.includes("."));
     setNafList(filtered);
@@ -37,7 +40,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/insee-activite?naf=${encodeURIComponent(
+        `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(
           selectedNaf
         )}&lat=${lat}&lng=${lng}&radius=${radius}`
       );
