@@ -79,7 +79,10 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
             </div>`
           )
         )
-        .on("click", () => onClickSetCenter(item.Latitude, item.Longitude))
+        .on("click", () => {
+          onClickSetCenter(item.Latitude, item.Longitude);
+          marker.togglePopup(); // 👈 Ajout de l'ouverture manuelle de la popup
+        })        
         .addTo(map.current!);
 
       markersRef.current.push(marker);
