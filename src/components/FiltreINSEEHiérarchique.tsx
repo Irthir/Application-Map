@@ -23,7 +23,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const [selectedNaf, setSelectedNaf] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  const isDev = import.meta.env.DEV;
+  const isDev = false;//import.meta.env.DEV;
   const baseUrl = isDev ? "http://localhost:5000" : "https://application-map.onrender.com";
 
   useEffect(() => {
