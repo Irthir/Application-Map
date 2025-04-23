@@ -10,47 +10,51 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
   const handleSearch = async () => {
     if (!input) return;
 
-    // Cas 1 : Recherche par SIREN
     if (/^\d{9}$/.test(input)) {
       try {
         const response = await fetch(`https://application-map.onrender.com/api/insee/${input}`);
         const data = await response.json();
         console.log("Données SIREN :", data);
 
-        if (data && data.denomination) {
-          let lat = data.adresse?.coordonnees?.latitude ?? data.adresse?.coordonnees?.lat ?? 0;
-          let lon = data.adresse?.coordonnees?.longitude ?? data.adresse?.coordonnees?.lon ?? 0;
+        const uniteLegale = data.uniteLegale;
+        if (!uniteLegale || !Array.isArray(uniteLegale.periodesUniteLegale)) {
+          alert("Informations indisponibles pour ce SIREN.");
+          return;
+        }
 
-          // Fallback géocodage si les coordonnées sont nulles ou à zéro
-          if ((!lat || !lon) && data.adresse?.libelle) {
-            const adresseStr = data.adresse.libelle;
-            const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(adresseStr)}`);
-            const geoData = await geoRes.json();
+        const activePeriod = uniteLegale.periodesUniteLegale.find(
+          (p: any) => p.dateFin === null
+        );
 
-            if (geoData.length > 0) {
-              const result = geoData[0];
-              lat = parseFloat(result.lat);
-              lon = parseFloat(result.lon);
-            }
-          }
+        const nom =
+          activePeriod?.denominationUniteLegale ||
+          activePeriod?.nomUniteLegale ||
+          "Entreprise";
 
+        // Fallback géocodage par nom via OpenStreetMap
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nom)}`
+        );
+        const geoData = await geoRes.json();
+
+        if (geoData.length > 0) {
+          const loc = geoData[0];
           onResults([
             {
-              Nom: data.denomination,
-              Latitude: lat,
-              Longitude: lon,
+              Nom: nom,
+              Latitude: parseFloat(loc.lat),
+              Longitude: parseFloat(loc.lon),
               Type: "Recherche",
             },
           ]);
         } else {
-          alert("Entreprise non trouvée.");
+          alert("Localisation introuvable pour cette entreprise.");
         }
-      } catch (error) {
-        console.error("Erreur lors de la recherche SIREN :", error);
-        alert("Une erreur est survenue lors de la recherche par SIREN.");
+      } catch (err) {
+        console.error("Erreur SIREN :", err);
+        alert("Erreur lors de la recherche par SIREN.");
       }
     } else {
-      // Cas 2 : Recherche par nom ou adresse (géocodage direct)
       try {
         const geoRes = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}`
@@ -72,7 +76,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         }
       } catch (error) {
         console.error("Erreur géocodage :", error);
-        alert("Une erreur est survenue lors du géocodage.");
+        alert("Erreur lors du géocodage.");
       }
     }
   };
