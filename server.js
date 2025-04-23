@@ -154,5 +154,36 @@ app.get("/api/insee-activite", async (req, res) => {
   }
 });
 
+app.get("/api/insee/:siren", async (req, res) => {
+  try {
+    await ensureToken();
+    const { siren } = req.params;
+
+    if (!siren || !/^\d{9}$/.test(siren)) {
+      return res.status(400).json({ error: "SIREN invalide" });
+    }
+
+    const url = `https://api.insee.fr/entreprises/sirene/V3.11/siren/${siren}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erreur API INSEE: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("💥 Erreur SIREN :", error);
+    res.status(500).json({ error: error.message || "Erreur serveur" });
+  }
+});
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Serveur en écoute sur http://localhost:${PORT}`));
