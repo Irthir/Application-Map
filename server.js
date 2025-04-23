@@ -8,7 +8,21 @@ import { LambertToWGS84 } from "./utils/lambertToWGS84.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// 🔐 Autorise uniquement ton frontend GitHub Pages
+const allowedOrigins = ["https://irthir.github.io"];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Autorise aussi Postman/local (pas d'origine)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  }
+}));
+
 app.use(express.json());
 
 const TOKEN_URL = "https://api.insee.fr/token";
@@ -76,7 +90,6 @@ app.get("/api/insee-activite", async (req, res) => {
     let start = 0;
     let total = 0;
 
-    // Nouvelle logique de pagination sans limite arbitraire
     while (start < 10000) {
       const url = `${API_URL}?q=${encodeURIComponent(query)}&nombre=${pageSize}&debut=${start}`;
       console.log("🔍 URL appelée :", url);
@@ -100,7 +113,7 @@ app.get("/api/insee-activite", async (req, res) => {
       allEtablissements = allEtablissements.concat(etablissements);
       start += pageSize;
 
-      if (etablissements.length < pageSize) break; // Fin des résultats
+      if (etablissements.length < pageSize) break;
     }
 
     const filtered = allEtablissements
@@ -141,5 +154,5 @@ app.get("/api/insee-activite", async (req, res) => {
   }
 });
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Serveur en écoute sur http://localhost:${PORT}`));
