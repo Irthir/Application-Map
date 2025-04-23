@@ -41,7 +41,7 @@ const App = () => {
 
         try {
           const res = await fetch(
-            `http://localhost:5000/api/insee-activite?naf=${encodeURIComponent(
+            `https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(
               nafCode
             )}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
           );

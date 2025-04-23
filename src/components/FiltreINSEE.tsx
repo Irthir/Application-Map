@@ -10,8 +10,8 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
   const [selectedNaf, setSelectedNaf] = useState("");
   const [radius, setRadius] = useState(5); // en km
 
-  const isDev = false;//import.meta.env.DEV;
-  const baseUrl = isDev ? "http://localhost:5000" : "https://application-map.onrender.com";
+  const isDev = import.meta.env.DEV;
+  const baseUrl = "https://application-map.onrender.com";
 
   const handleSearch = async () => {
     if (!selectedNaf) return;

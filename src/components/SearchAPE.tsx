@@ -11,7 +11,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
     if (!input) return;
 
     if (/^\d{9}$/.test(input)) {
-      const response = await fetch(`http://localhost:5000/api/insee/${input}`);
+      const response = await fetch(`https://application-map.onrender.com/api/insee/${input}`);
       const data = await response.json();
 
       if (data && data.denomination) {

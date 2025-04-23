@@ -23,8 +23,8 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const [selectedNaf, setSelectedNaf] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  const isDev = false;//import.meta.env.DEV;
-  const baseUrl = isDev ? "http://localhost:5000" : "https://application-map.onrender.com";
+  const isDev = import.meta.env.DEV;
+  const baseUrl = "https://application-map.onrender.com";
 
   useEffect(() => {
     const filtered = nafCodes.filter((code) => code.id.includes("."));
