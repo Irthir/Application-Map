@@ -28,6 +28,10 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
       if (!res.ok) throw new Error("Erreur lors de la récupération des données INSEE");
 
       const data = await res.json();
+      if (!Array.isArray(data)) {
+        console.error("Données INSEE inattendues", data);
+        return;
+      }      
       const result = data.map((e: any) => ({
         Nom: e.Nom,
         Latitude: e.latitude ?? e.lat ?? 0,
