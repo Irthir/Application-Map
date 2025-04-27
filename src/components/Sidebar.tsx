@@ -3,6 +3,7 @@ import SearchAPE from "./SearchAPE";
 import FiltreSecteurs from "./FiltreSecteurs";
 import { FaEye, FaEyeSlash, FaMapMarkerAlt, FaTimes, FaFileCsv } from "react-icons/fa";
 import { DataPoint } from "../type.ts";
+import { toast } from "react-hot-toast";
 
 interface SidebarProps {
   data: DataPoint[];
@@ -49,7 +50,15 @@ const Sidebar = ({
     setGlobalLoading(true);
     try {
       const results = await promise;
-      onSearchResults(results);
+      if (results.length === 0) {
+        toast.error("❗ Aucun résultat trouvé.");
+      } else {
+        onSearchResults(results);
+        toast.success(`✅ ${results.length} résultat(s) ajouté(s) !`);
+      }
+    } catch (err) {
+      console.error("Erreur lors du traitement des résultats :", err);
+      toast.error("❗ Erreur lors du traitement des résultats.");
     } finally {
       setGlobalLoading(false);
     }

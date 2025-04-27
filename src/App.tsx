@@ -5,9 +5,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import "./App.css";
 import ImportCSV from "./components/Import";
 import { DataPoint } from "./type.ts";
-import { Toaster } from 'react-hot-toast';
-import toast from 'react-hot-toast';
-
+import { Toaster, toast } from 'react-hot-toast';
 
 const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
@@ -23,36 +21,38 @@ const App = () => {
         e.returnValue = "Vous avez des modifications non sauvegardées.";
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [unsavedChanges]);
 
   useEffect(() => {
-    const listener = async (e: CustomEvent) => {
+    const listener = async (e: any) => {
       const selected = data.find(d => d.Nom === e.detail.nom);
-      if (selected) {
-        const nafCode = e.detail.naf;
-        if (!nafCode) return;
+      if (!selected) {
+        toast.error("❗ Entreprise sélectionnée introuvable.");
+        return;
+      }
+      const nafCode = e.detail.naf;
+      if (!nafCode) {
+        toast.error("❗ Secteur d’activité non défini.");
+        return;
+      }
 
-        try {
-          const res = await fetch(
-            /*`http://localhost:5000*/`https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(
-              nafCode
-            )}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
-          );
-          const entreprises = await res.json();
-          await handleSearchResults(entreprises);
-        } catch (err) {
-          console.error("Erreur lors de la recherche similaire :", err);
-          //alert("Erreur lors de la recherche de secteurs similaires.");
-          toast.error("❗ Erreur lors de la recherche de secteurs similaires.");
-        }
+      try {
+        const res = await fetch(
+          `https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(nafCode)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
+        );
+        if (!res.ok) throw new Error("Erreur serveur");
+        const entreprises = await res.json();
+        await handleSearchResults(entreprises);
+      } catch (err) {
+        console.error("Erreur lors de la recherche similaire :", err);
+        toast.error("❗ Erreur lors de la recherche de secteurs similaires.");
       }
     };
 
-    window.addEventListener("search-similar", listener as any);
-    return () => window.removeEventListener("search-similar", listener as any);
+    window.addEventListener("search-similar", listener);
+    return () => window.removeEventListener("search-similar", listener);
   }, [data, filterRadius]);
 
   const handleCenterMap = (lat: number, lon: number) => {
@@ -98,16 +98,13 @@ const App = () => {
       setMapCenter([newEntries[0].Longitude, newEntries[0].Latitude]);
       setUnsavedChanges(true);
     } else {
-      //alert("🔎 Aucun établissement trouvé correspondant à votre recherche.");
       toast.error("❗ Aucun établissement trouvé correspondant à votre recherche.");
     }
   };
 
   const handleSetType = (nom: string, type: "Client" | "Prospect" | "") => {
     setData(prev =>
-      prev.map(item =>
-        item.Nom === nom ? { ...item, Type: type } : item
-      )
+      prev.map(item => item.Nom === nom ? { ...item, Type: type } : item)
     );
     setUnsavedChanges(true);
   };
@@ -120,7 +117,6 @@ const App = () => {
   const handleExport = () => {
     const markedData = data.filter(d => d.Type === "Client" || d.Type === "Prospect");
     if (markedData.length === 0) {
-      //alert("❗ Aucune donnée marquée à exporter.");
       toast.error("❗ Aucune donnée marquée à exporter.");
       return;
     }
@@ -196,7 +192,6 @@ const App = () => {
           center={mapCenter}
           onClickSetCenter={(lat, lng) => setMapCenter([lng, lat])}
         />
-
         <div className="import-button-overlay">
           <ImportCSV onUpload={handleUpload} />
         </div>
