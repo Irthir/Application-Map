@@ -7,7 +7,9 @@ const Auth = () => {
   const handleLogin = async () => {
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) console.error(error.message);
-    else alert("Check your email for the login link!");
+    else
+    //alert("Check your email for the login link!");
+    toast.success("Un lien de connexion a été envoyé à votre email.");
   };
 
   return (

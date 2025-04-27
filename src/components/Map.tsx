@@ -1,4 +1,3 @@
-// Map.tsx
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import * as turf from "@turf/turf";
@@ -23,39 +22,43 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v11",
-      center: center,
+      center,
       zoom: 12,
     });
 
     map.current.on("click", (e) => {
-      const features = map.current?.queryRenderedFeatures(e.point, { layers: ["search-radius-circle"] });
-      if (features && features.length > 0) {
-        return; // Ignore clicks on the search circle
-      }
+      if (!map.current) return;
 
+      const features = map.current.queryRenderedFeatures(e.point);
+      const clickedOnCircle = features.some(f => f.layer?.id === "search-radius-circle");
       const popupOpen = document.querySelector(".mapboxgl-popup") !== null;
-      if (popupOpen) return;
+
+      if (popupOpen || clickedOnCircle) return;
 
       const { lng, lat } = e.lngLat;
       onClickSetCenter(lat, lng);
     });
 
-    return () => map.current?.remove();
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
   }, []);
 
   useEffect(() => {
-    if (map.current && center) {
-      map.current.flyTo({
-        center,
-        zoom: map.current.getZoom(), // 👈 garde le zoom actuel
-        essential: false,             // 👈 flyTo tout doux
-      });
-    }
+    if (!map.current || !center) return;
+
+    map.current.flyTo({
+      center,
+      zoom: 14,
+      essential: true,
+    });
   }, [center]);
 
   useEffect(() => {
     if (!map.current) return;
 
+    // Supprimer tous les anciens marqueurs
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
@@ -63,32 +66,26 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
       let color;
       switch (item.Type) {
         case "Client":
-          color = "#10B981"; // vert
+          color = "#10B981";
           break;
         case "Prospect":
-          color = "#F59E0B"; // jaune
+          color = "#F59E0B";
           break;
         default:
-          color = "#9CA3AF"; // gris
+          color = "#9CA3AF";
       }
-
-      const sanitizedNom = item.Nom.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
       const marker = new mapboxgl.Marker({ color })
         .setLngLat([item.Longitude, item.Latitude])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<div class="popup-content">
-              <strong>${sanitizedNom}</strong><br>
+              <strong>${item.Nom}</strong><br>
               Type: ${item.Type || "Non marqué"}<br>
-              <button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: '${sanitizedNom}' }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>
+              <button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: { nom: '${item.Nom}', naf: '${item.Type}' } }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>
             </div>`
           )
         )
-        .on("click", () => {
-          onClickSetCenter(item.Latitude, item.Longitude);
-          marker.togglePopup();
-        })
         .addTo(map.current!);
 
       markersRef.current.push(marker);
@@ -101,20 +98,20 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
     const addCircleLayer = () => {
       const circleId = "search-radius-circle";
 
-      if (map.current!.getLayer(circleId)) map.current!.removeLayer(circleId);
-      if (map.current!.getSource(circleId)) map.current!.removeSource(circleId);
+      if (map.current?.getLayer(circleId)) map.current.removeLayer(circleId);
+      if (map.current?.getSource(circleId)) map.current.removeSource(circleId);
 
       const circle = turf.circle(center, filterRadius || 5, {
         steps: 64,
         units: "kilometers",
       });
 
-      map.current!.addSource(circleId, {
+      map.current?.addSource(circleId, {
         type: "geojson",
         data: circle,
       });
 
-      map.current!.addLayer({
+      map.current?.addLayer({
         id: circleId,
         type: "fill",
         source: circleId,
@@ -123,14 +120,6 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
           "fill-color": "#1D4ED8",
           "fill-opacity": 0.2,
         },
-      });
-
-      // Empêche le curseur "pointer" sur le cercle
-      map.current!.on('mouseenter', circleId, () => {
-        map.current!.getCanvas().style.cursor = '';
-      });
-      map.current!.on('mouseleave', circleId, () => {
-        map.current!.getCanvas().style.cursor = '';
       });
     };
 

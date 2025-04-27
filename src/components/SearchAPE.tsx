@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from 'react-hot-toast';
 
 interface SearchAPEProps {
   onResults: (data: any) => void;
@@ -17,13 +18,14 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
 
     if (/^\d{9}$/.test(input)) {
       try {
-        const response = await fetch(`https://application-map.onrender.com/api/insee/${input}`);
+        const response = await fetch(/*'http://localhost:5000*/'https://application-map.onrender.com/api/insee/${input}');
         const data = await response.json();
         console.log("Données SIREN :", data);
 
         const uniteLegale = data.uniteLegale;
         if (!uniteLegale || !Array.isArray(uniteLegale.periodesUniteLegale)) {
-          alert("Informations indisponibles pour ce SIREN.");
+          //alert("Informations indisponibles pour ce SIREN.");
+          toast.error("Informations indisponibles pour ce SIREN.");
           setLoading(false);
           return;
         }
@@ -53,11 +55,13 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
             },
           ]);
         } else {
-          alert("Localisation introuvable pour cette entreprise.");
+          //alert("Localisation introuvable pour cette entreprise.");
+          toast.error("Localisation introuvable pour cette entreprise.");
         }
       } catch (err) {
         console.error("Erreur SIREN :", err);
-        alert("Erreur lors de la recherche par SIREN.");
+        //alert("Erreur lors de la recherche par SIREN.");
+        toast.error("Erreur lors de la recherche par SIREN.");
       } finally {
         setLoading(false);
       }
@@ -71,11 +75,13 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         if (geoData.length > 0) {
           setSearchResults(geoData.slice(0, 10)); // 🔥 limité à 10
         } else {
-          alert("Adresse ou nom d’entreprise non trouvée.");
+          //alert("Adresse ou nom d’entreprise non trouvée.");
+          toast.error("Adresse ou nom d’entreprise non trouvée.");
         }
       } catch (error) {
         console.error("Erreur géocodage :", error);
-        alert("Erreur lors du géocodage.");
+        //alert("Erreur lors du géocodage.");
+        toast.error("Erreur lors du géocodage.");
       } finally {
         setLoading(false);
       }

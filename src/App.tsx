@@ -1,17 +1,13 @@
-// App.tsx
 import { useEffect, useState } from "react";
 import Map from "./components/Map";
 import Sidebar from "./components/Sidebar";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./App.css";
 import ImportCSV from "./components/Import";
+import { DataPoint } from "./type.ts";
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
-interface DataPoint {
-  Nom: string;
-  Latitude: number;
-  Longitude: number;
-  Type: string;
-}
 
 const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
@@ -33,27 +29,30 @@ const App = () => {
   }, [unsavedChanges]);
 
   useEffect(() => {
-    const listener = async (e: any) => {
-      const selected = data.find(d => d.Nom === e.detail);
+    const listener = async (e: CustomEvent) => {
+      const selected = data.find(d => d.Nom === e.detail.nom);
       if (selected) {
-        const nafCode = prompt("Code NAF à rechercher ? (par ex : 62.01Z)", "62.01Z");
+        const nafCode = e.detail.naf;
         if (!nafCode) return;
 
         try {
           const res = await fetch(
-            `https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(
+            /*`http://localhost:5000*/`https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(
               nafCode
             )}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
           );
           const entreprises = await res.json();
-          handleSearchResults(entreprises);
+          await handleSearchResults(entreprises);
         } catch (err) {
           console.error("Erreur lors de la recherche similaire :", err);
+          //alert("Erreur lors de la recherche de secteurs similaires.");
+          toast.error("❗ Erreur lors de la recherche de secteurs similaires.");
         }
       }
     };
-    window.addEventListener("search-similar", listener);
-    return () => window.removeEventListener("search-similar", listener);
+
+    window.addEventListener("search-similar", listener as any);
+    return () => window.removeEventListener("search-similar", listener as any);
   }, [data, filterRadius]);
 
   const handleCenterMap = (lat: number, lon: number) => {
@@ -72,48 +71,37 @@ const App = () => {
 
   const handleSearchResults = async (results: any[]) => {
     removeRechercheMarkers();
-  
     const newEntries: DataPoint[] = [];
-  
+
     for (const entry of results) {
       try {
         const nom = entry.Nom || "Entreprise";
         const hasCoords = typeof entry.Latitude === "number" && typeof entry.Longitude === "number";
-  
+
         if (hasCoords) {
-          // On a déjà des coordonnées => on les utilise
           newEntries.push({
             Nom: nom,
             Latitude: entry.Latitude,
             Longitude: entry.Longitude,
+            Adresse: entry.adresse || "",
+            Secteur: entry.secteur || "",
             Type: entry.Type || "Recherche",
           });
-        } else if (entry.adresse && entry.adresse.trim() !== "") {
-          // Pas de coordonnées => géocodage de l'adresse
-          const geoData = await geocodeAddress(`${entry.adresse}, France`);
-          newEntries.push({
-            Nom: nom,
-            Latitude: geoData.latitude,
-            Longitude: geoData.longitude,
-            Type: "Recherche",
-          });
-        } else {
-          console.warn("❌ Donnée sans coordonnées ni adresse :", entry);
         }
       } catch (error) {
-        console.error("Erreur lors du traitement d’un résultat :", error);
+        console.error("Erreur traitement résultat :", error);
       }
     }
-  
+
     if (newEntries.length > 0) {
       setData(prev => [...prev, ...newEntries]);
       setMapCenter([newEntries[0].Longitude, newEntries[0].Latitude]);
       setUnsavedChanges(true);
     } else {
-      alert("Aucune donnée valide à afficher.");
+      //alert("🔎 Aucun établissement trouvé correspondant à votre recherche.");
+      toast.error("❗ Aucun établissement trouvé correspondant à votre recherche.");
     }
   };
-  
 
   const handleSetType = (nom: string, type: "Client" | "Prospect" | "") => {
     setData(prev =>
@@ -132,18 +120,17 @@ const App = () => {
   const handleExport = () => {
     const markedData = data.filter(d => d.Type === "Client" || d.Type === "Prospect");
     if (markedData.length === 0) {
-      alert("Aucune donnée marquée à exporter.");
+      //alert("❗ Aucune donnée marquée à exporter.");
+      toast.error("❗ Aucune donnée marquée à exporter.");
       return;
     }
 
     const csvContent = [
-      ["Nom", "Latitude", "Longitude", "Type"],
-      ...markedData.map(({ Nom, Latitude, Longitude, Type }) => [
-        Nom, Latitude.toString(), Longitude.toString(), Type,
+      ["Nom", "Latitude", "Longitude", "Type", "Adresse", "Secteur"],
+      ...markedData.map(({ Nom, Latitude, Longitude, Type, Adresse = "", Secteur = "" }) => [
+        Nom, Latitude.toString(), Longitude.toString(), Type, Adresse, Secteur,
       ]),
-    ]
-      .map(row => row.join(","))
-      .join("\n");
+    ].map(row => row.join(",")).join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -155,28 +142,14 @@ const App = () => {
     setUnsavedChanges(false);
   };
 
-  const geocodeAddress = async (address: string) => {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`;
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'MaSuperApp/1.0 (contact@exemple.com)',
-      }
-    });
-
-    if (!res.ok) {
-      throw new Error(`Erreur réseau : ${res.status}`);
-    }
-
-    const data = await res.json();
-
-    if (!data || data.length === 0) {
-      throw new Error("Adresse non trouvée");
-    }
-
-    return {
-      latitude: parseFloat(data[0].lat),
-      longitude: parseFloat(data[0].lon),
-    };
+  const handleDownloadTemplate = () => {
+    const csvContent = "Nom,Latitude,Longitude,Type,Adresse,Secteur\n";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "template_import.csv");
+    link.click();
   };
 
   const handleUpload = (uploadedData: any[]) => {
@@ -185,6 +158,8 @@ const App = () => {
       Latitude: parseFloat(item.Latitude),
       Longitude: parseFloat(item.Longitude),
       Type: item.Type,
+      Adresse: item.Adresse || "",
+      Secteur: item.Secteur || "",
     }));
     setData(formatted);
     setUnsavedChanges(false);
@@ -206,6 +181,7 @@ const App = () => {
         hiddenMarkers={hiddenMarkers}
         onSetType={handleSetType}
         onExport={handleExport}
+        onDownloadTemplate={handleDownloadTemplate}
         onRemoveItem={handleRemoveItem}
         mapCenter={mapCenter}
         filterRadius={filterRadius}
@@ -224,6 +200,7 @@ const App = () => {
         <div className="import-button-overlay">
           <ImportCSV onUpload={handleUpload} />
         </div>
+        <Toaster position="top-center" reverseOrder={false} />
       </main>
     </div>
   );

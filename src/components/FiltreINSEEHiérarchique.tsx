@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import nafCodes from "../data/naf-codes.json";
+import toast from 'react-hot-toast';
 
 interface NafCode {
   id: string;
@@ -24,7 +25,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
 
   //const isDev = import.meta.env.DEV;
-  const baseUrl = "https://application-map.onrender.com";
+  const baseUrl = "https://application-map.onrender.com";//"http://localhost:5000";
 
   useEffect(() => {
     const filtered = nafCodes.filter((code) => code.id.includes("."));
@@ -49,13 +50,15 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
       const data = await res.json();
 
       if (data.length === 0) {
-        alert("Aucun établissement trouvé. Essayez d'élargir le rayon ou de changer de secteur.");
+        //alert("Aucun établissement trouvé. Essayez d'élargir le rayon ou de changer de secteur.");
+        toast.error("Aucun établissement trouvé. Essayez d'élargir le rayon ou de changer de secteur.");
       }
 
       onSearchResults(data);
     } catch (error) {
       console.error("Erreur INSEE :", error);
-      alert("Impossible de récupérer les données INSEE.");
+      //alert("Impossible de récupérer les données INSEE.");
+      toast.error("Impossible de récupérer les données INSEE.");
     } finally {
       setLoading(false);
     }

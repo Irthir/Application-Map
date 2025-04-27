@@ -9,12 +9,10 @@ dotenv.config();
 
 const app = express();
 
-// 🔐 Autorise uniquement ton frontend GitHub Pages
-const allowedOrigins = ["https://irthir.github.io"];
+const allowedOrigins = ["https://irthir.github.io", "http://localhost:5173"];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Autorise aussi Postman/local (pas d'origine)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -88,7 +86,6 @@ app.get("/api/insee-activite", async (req, res) => {
     const pageSize = 1000;
     let allEtablissements = [];
     let start = 0;
-    let total = 0;
 
     while (start < 10000) {
       const url = `${API_URL}?q=${encodeURIComponent(query)}&nombre=${pageSize}&debut=${start}`;
@@ -108,9 +105,15 @@ app.get("/api/insee-activite", async (req, res) => {
 
       const data = await response.json();
       const etablissements = data.etablissements || [];
-      total = data.header?.total || etablissements.length;
 
-      allEtablissements = allEtablissements.concat(etablissements);
+      allEtablissements = allEtablissements.concat(
+        etablissements.filter((e) => {
+          const isActive = e.etatAdministratifEtablissement === "A";
+          const isCompany = parseInt(e.uniteLegale?.categorieJuridiqueUniteLegale || "0") >= 2000;
+          return isActive && isCompany;
+        })
+      );
+
       start += pageSize;
 
       if (etablissements.length < pageSize) break;
@@ -142,7 +145,8 @@ app.get("/api/insee-activite", async (req, res) => {
           CodeCommune: e.adresseEtablissement.codeCommuneEtablissement,
           Type: "Recherche",
           Distance: distance.toFixed(2),
-          adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`.trim()
+          adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`.trim(),
+          secteur: e.periodesEtablissement?.[0]?.activitePrincipaleEtablissement || "",
         };
       })
       .filter(Boolean);
@@ -183,7 +187,6 @@ app.get("/api/insee/:siren", async (req, res) => {
     res.status(500).json({ error: error.message || "Erreur serveur" });
   }
 });
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Serveur en écoute sur http://localhost:${PORT}`));

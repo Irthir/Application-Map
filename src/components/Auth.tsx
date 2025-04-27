@@ -1,5 +1,6 @@
 import { useState } from "react"; // Ajoute cet import
 import { supabase } from "../services/Authentification"; // Import du client Supabase
+import { toast } from "react-hot-toast"; // Import de toast pour les notifications
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -8,9 +9,11 @@ const Auth = () => {
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
       console.error(error.message);
-      alert("Erreur lors de la connexion, vérifiez votre email.");
+      //alert("Erreur lors de la connexion, vérifiez votre email.");
+      toast.error("Erreur lors de la connexion, vérifiez votre email.");
     } else {
-      alert("Un lien de connexion a été envoyé à votre email.");
+      //alert("Un lien de connexion a été envoyé à votre email.");
+      toast.success("Un lien de connexion a été envoyé à votre email.");
     }
   };
 

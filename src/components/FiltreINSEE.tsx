@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import nafCodes from "../data/naf-codes.json";
+import toast from 'react-hot-toast';
 
 interface Props {
   center: [number, number]; // [lng, lat]
@@ -11,7 +12,7 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
   const [radius, setRadius] = useState(5); // en km
 
   //const isDev = import.meta.env.DEV;
-  const baseUrl = "https://application-map.onrender.com";
+  const baseUrl = "https://application-map.onrender.com";//"http://localhost:5000";
 
   const handleSearch = async () => {
     if (!selectedNaf) return;
@@ -40,13 +41,15 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
       }));
 
       if (result.length === 0) {
-        alert("Aucune entreprise trouvée pour ce code APE et ce rayon.");
+        //alert("Aucune entreprise trouvée pour ce code APE et ce rayon.");
+        toast.error("Aucune entreprise trouvée pour ce code APE et ce rayon.");
       }
 
       onSearchResults(result);
     } catch (error) {
       console.error("Erreur INSEE :", error);
-      alert("Erreur lors de la récupération des données INSEE.");
+      //alert("Erreur lors de la récupération des données INSEE.");
+      toast.error("Erreur lors de la récupération des données INSEE.");
     }
   };
 
