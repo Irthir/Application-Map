@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { fetchCompanyBySIREN, geocodeCompany } from "../services/apiUtils";
 
 interface SearchAPEProps {
-  onResults: (data: any) => void;
+  onResults: (data: any[]) => void;
 }
 
 const SearchAPE = ({ onResults }: SearchAPEProps) => {
@@ -12,14 +12,14 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
-    if (!input) return;
+    if (!input.trim() || loading) return; // Eviter recherche vide ou spam double clic
 
     setSearchResults([]);
     setLoading(true);
 
-    if (/^\d{9}$/.test(input.replace(/\s+/g, ""))) {
-      // Recherche par SIREN
-      try {
+    try {
+      if (/^\d{9}$/.test(input.replace(/\s+/g, ""))) {
+        // Recherche par SIREN
         const companyData = await fetchCompanyBySIREN(input.replace(/\s+/g, ""));
         console.log("Données SIREN :", companyData);
 
@@ -27,12 +27,12 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         const activePeriod = uniteLegale?.periodesUniteLegale?.find((p: any) => p.dateFin === null);
 
         if (!uniteLegale || !activePeriod) {
-          toast.error("Informations indisponibles pour ce SIREN.");
+          toast.error("❗ Informations indisponibles pour ce SIREN.");
           return;
         }
 
-        const nom = activePeriod?.denominationUniteLegale || activePeriod?.nomUniteLegale || "Entreprise";
-        const naf = activePeriod?.activitePrincipaleUniteLegale || "";
+        const nom = activePeriod.denominationUniteLegale || activePeriod.nomUniteLegale || "Entreprise";
+        const naf = activePeriod.activitePrincipaleUniteLegale || "";
 
         const geoData = await geocodeCompany(nom);
 
@@ -43,38 +43,32 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
               Latitude: geoData.lat,
               Longitude: geoData.lon,
               Type: "Recherche",
-              Secteur: naf, // 🔥 on passe le code NAF récupéré ici
+              Secteur: naf, // 🔥 on passe aussi le secteur
             },
           ]);
           setInput(nom);
+          toast.success("✅ Entreprise trouvée !");
         } else {
-          toast.error("Localisation introuvable pour cette entreprise.");
+          toast.error("❗ Localisation introuvable pour cette entreprise.");
         }
-      } catch (err) {
-        console.error("Erreur SIREN :", err);
-        toast.error("Erreur lors de la recherche par SIREN.");
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // Recherche par nom ou adresse
-      try {
+      } else {
+        // Recherche par nom ou adresse
         const geoRes = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(input)}`
         );
         const geoData = await geoRes.json();
 
         if (geoData.length > 0) {
-          setSearchResults(geoData.slice(0, 10));
+          setSearchResults(geoData.slice(0, 10)); // Limiter pour éviter surcharge
         } else {
-          toast.error("Adresse ou nom d’entreprise non trouvée.");
+          toast.error("❗ Adresse ou nom d’entreprise non trouvé.");
         }
-      } catch (error) {
-        console.error("Erreur géocodage :", error);
-        toast.error("Erreur lors du géocodage.");
-      } finally {
-        setLoading(false);
       }
+    } catch (error) {
+      console.error("Erreur de recherche :", error);
+      toast.error("❗ Une erreur est survenue pendant la recherche.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,6 +80,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         Latitude: parseFloat(result.lat),
         Longitude: parseFloat(result.lon),
         Type: "Recherche",
+        Secteur: "", // 🔥 Pas de secteur connu pour Nominatim
       },
     ]);
     setInput(result.display_name);
@@ -111,6 +106,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+          disabled={loading}
         />
         {loading && (
           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -124,7 +120,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
         disabled={loading}
       >
-        Rechercher
+        {loading ? "Recherche..." : "Rechercher"}
       </button>
 
       {searchResults.length > 0 && (

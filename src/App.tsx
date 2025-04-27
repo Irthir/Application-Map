@@ -26,18 +26,19 @@ const App = () => {
   }, [unsavedChanges]);
 
   useEffect(() => {
-    const listener = async (e: any) => {
-      const selected = data.find(d => d.Nom === e.detail.nom);
+    const listener = async (e: Event) => {
+      const customEvent = e as CustomEvent<{ nom: string; naf: string }>;
+      const selected = data.find(d => d.Nom === customEvent.detail.nom);
       if (!selected) {
         toast.error("❗ Entreprise sélectionnée introuvable.");
         return;
       }
-      const nafCode = e.detail.naf;
+      const nafCode = customEvent.detail.naf;
       if (!nafCode) {
         toast.error("❗ Secteur d’activité non défini.");
         return;
       }
-
+  
       try {
         const res = await fetch(
           `https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(nafCode)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
@@ -50,7 +51,7 @@ const App = () => {
         toast.error("❗ Erreur lors de la recherche de secteurs similaires.");
       }
     };
-
+  
     window.addEventListener("search-similar", listener);
     return () => window.removeEventListener("search-similar", listener);
   }, [data, filterRadius]);
@@ -85,6 +86,7 @@ const App = () => {
             Longitude: entry.Longitude,
             Adresse: entry.adresse || "",
             Secteur: entry.secteur || "",
+            CodeNAF: entry.codeNAF || "",  // ✅ Ajout sécurisé ici
             Type: entry.Type || "Recherche",
           });
         }
@@ -97,6 +99,7 @@ const App = () => {
       setData(prev => [...prev, ...newEntries]);
       setMapCenter([newEntries[0].Longitude, newEntries[0].Latitude]);
       setUnsavedChanges(true);
+      toast.success(`✅ ${newEntries.length} établissement(s) trouvé(s) et ajouté(s)`);
     } else {
       toast.error("❗ Aucun établissement trouvé correspondant à votre recherche.");
     }
@@ -122,9 +125,9 @@ const App = () => {
     }
 
     const csvContent = [
-      ["Nom", "Latitude", "Longitude", "Type", "Adresse", "Secteur"],
-      ...markedData.map(({ Nom, Latitude, Longitude, Type, Adresse = "", Secteur = "" }) => [
-        Nom, Latitude.toString(), Longitude.toString(), Type, Adresse, Secteur,
+      ["Nom", "Latitude", "Longitude", "Type", "Adresse", "Secteur", "CodeNAF"],
+      ...markedData.map(({ Nom, Latitude, Longitude, Type, Adresse = "", Secteur = "", CodeNAF = "" }) => [
+        Nom, Latitude.toString(), Longitude.toString(), Type, Adresse, Secteur, CodeNAF,
       ]),
     ].map(row => row.join(",")).join("\n");
 
@@ -136,16 +139,18 @@ const App = () => {
     link.click();
 
     setUnsavedChanges(false);
+    toast.success("✅ Export CSV effectué !");
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = "Nom,Latitude,Longitude,Type,Adresse,Secteur\n";
+    const csvContent = "Nom,Latitude,Longitude,Type,Adresse,Secteur,CodeNAF\n";
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute("download", "template_import.csv");
     link.click();
+    toast.success("✅ Modèle CSV téléchargé !");
   };
 
   const handleUpload = (uploadedData: any[]) => {
@@ -156,9 +161,11 @@ const App = () => {
       Type: item.Type,
       Adresse: item.Adresse || "",
       Secteur: item.Secteur || "",
+      CodeNAF: item.CodeNAF || "",
     }));
     setData(formatted);
     setUnsavedChanges(false);
+    toast.success(`✅ ${formatted.length} entrée(s) importée(s)`);
   };
 
   const handleFilter = (radius: number) => {

@@ -131,11 +131,11 @@ const Sidebar = ({
                   )}
                 </button>
 
-                {item.Secteur && (
+                {item.CodeNAF && (
                   <button
                     onClick={() =>
                       window.dispatchEvent(
-                        new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.Secteur } })
+                        new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.CodeNAF } })
                       )
                     }
                     className="p-1 rounded bg-indigo-100 hover:bg-indigo-200 text-xs"
