@@ -71,7 +71,7 @@ app.get("/api/insee-activite", async (req, res) => {
   try {
     await ensureToken();
 
-    const { naf, lat, lng, radius, onlyActive = "true", onlyCompany = "true" } = req.query;
+    const { naf, lat, lng, radius, onlyActive = "false", onlyCompanies = "false" } = req.query;
     if (!naf || !lat || !lng || !radius) {
       return res.status(400).json({ error: "Paramètres 'naf', 'lat', 'lng', 'radius' requis." });
     }
@@ -79,8 +79,8 @@ app.get("/api/insee-activite", async (req, res) => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
     const radiusNum = parseFloat(radius);
-    const applyActiveFilter = onlyActive === "true";
-    const applyCompanyFilter = onlyCompany === "true";
+    const filterActive = onlyActive === "true";
+    const filterCompany = onlyCompanies === "true";
 
     const query = `periode(activitePrincipaleEtablissement:${naf})`;
     const pageSize = 1000;
@@ -106,14 +106,10 @@ app.get("/api/insee-activite", async (req, res) => {
       const data = await response.json();
       const etablissements = data.etablissements || [];
 
-      console.log(`📦 Page ${start / pageSize + 1}: ${etablissements.length} établissements récupérés`);
-
       allEtablissements = allEtablissements.concat(
         etablissements.filter((e) => {
-          const isActive = e.etatAdministratifEtablissement === "A";
-          const isCompany = parseInt(e.uniteLegale?.categorieJuridiqueUniteLegale || "0") >= 2000;
-          if (applyActiveFilter && !isActive) return false;
-          if (applyCompanyFilter && !isCompany) return false;
+          if (filterActive && e.etatAdministratifEtablissement !== "A") return false;
+          if (filterCompany && parseInt(e.uniteLegale?.categorieJuridiqueUniteLegale || "0") < 2000) return false;
           return true;
         })
       );
@@ -121,8 +117,6 @@ app.get("/api/insee-activite", async (req, res) => {
       start += pageSize;
       if (etablissements.length < pageSize) break;
     }
-
-    console.log(`✅ Total après filtrage : ${allEtablissements.length} établissements`);
 
     const filtered = allEtablissements
       .map((e) => {
@@ -156,14 +150,13 @@ app.get("/api/insee-activite", async (req, res) => {
       })
       .filter(Boolean);
 
-    console.log(`🏁 Final : ${filtered.length} établissements dans la zone.`);
-
     res.json(filtered);
   } catch (error) {
     console.error("💥 Erreur INSEE :", error);
     res.status(500).json({ error: error.message || "Erreur interne" });
   }
 });
+
 
 app.get("/api/insee/:siren", async (req, res) => {
   try {
