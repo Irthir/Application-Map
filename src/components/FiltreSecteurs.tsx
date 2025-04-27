@@ -95,7 +95,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
       </div>
 
       {expanded && (
-        <div className="max-h-64 overflow-y-auto border rounded p-2 space-y-1">
+        <div className="max-h-64 overflow-y-auto border rounded p-2 grid grid-cols-2 gap-2">
           {filteredNaf.map((n) => (
             <label
               key={n.id}
