@@ -66,4 +66,9 @@ html, body, #root {
   top: 1rem;
   right: 1rem;
   z-index: 999;
+  pointer-events: none; /* <-- important */
+}
+
+.import-button-overlay > * {
+  pointer-events: auto; /* <-- seulement les enfants (bouton importer) peuvent recevoir les clics */
 }

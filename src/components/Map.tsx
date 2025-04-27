@@ -28,9 +28,13 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
     });
 
     map.current.on("click", (e) => {
-      const features = map.current?.queryRenderedFeatures(e.point);
+      const features = map.current?.queryRenderedFeatures(e.point, { layers: ["search-radius-circle"] });
+      if (features && features.length > 0) {
+        return; // Ignore clicks on the search circle
+      }
+
       const popupOpen = document.querySelector(".mapboxgl-popup") !== null;
-      if (popupOpen || features?.some(f => f.layer?.id.includes("marker"))) return;
+      if (popupOpen) return;
 
       const { lng, lat } = e.lngLat;
       onClickSetCenter(lat, lng);
@@ -43,8 +47,8 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
     if (map.current && center) {
       map.current.flyTo({
         center,
-        zoom: 14,
-        essential: true,
+        zoom: map.current.getZoom(), // 👈 garde le zoom actuel
+        essential: false,             // 👈 flyTo tout doux
       });
     }
   }, [center]);
@@ -59,30 +63,32 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
       let color;
       switch (item.Type) {
         case "Client":
-          color = "#10B981";
+          color = "#10B981"; // vert
           break;
         case "Prospect":
-          color = "#F59E0B";
+          color = "#F59E0B"; // jaune
           break;
         default:
-          color = "#9CA3AF";
+          color = "#9CA3AF"; // gris
       }
+
+      const sanitizedNom = item.Nom.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
       const marker = new mapboxgl.Marker({ color })
         .setLngLat([item.Longitude, item.Latitude])
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<div class="popup-content">
-              <strong>${item.Nom}</strong><br>
+              <strong>${sanitizedNom}</strong><br>
               Type: ${item.Type || "Non marqué"}<br>
-              <button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: '${item.Nom}' }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>
+              <button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: '${sanitizedNom}' }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>
             </div>`
           )
         )
         .on("click", () => {
           onClickSetCenter(item.Latitude, item.Longitude);
-          marker.togglePopup(); // 👈 Ajout de l'ouverture manuelle de la popup
-        })        
+          marker.togglePopup();
+        })
         .addTo(map.current!);
 
       markersRef.current.push(marker);
@@ -91,23 +97,23 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
 
   useEffect(() => {
     if (!map.current || !center) return;
-  
+
     const addCircleLayer = () => {
       const circleId = "search-radius-circle";
-  
+
       if (map.current!.getLayer(circleId)) map.current!.removeLayer(circleId);
       if (map.current!.getSource(circleId)) map.current!.removeSource(circleId);
-  
+
       const circle = turf.circle(center, filterRadius || 5, {
         steps: 64,
         units: "kilometers",
       });
-  
+
       map.current!.addSource(circleId, {
         type: "geojson",
         data: circle,
       });
-  
+
       map.current!.addLayer({
         id: circleId,
         type: "fill",
@@ -118,15 +124,22 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
           "fill-opacity": 0.2,
         },
       });
+
+      // Empêche le curseur "pointer" sur le cercle
+      map.current!.on('mouseenter', circleId, () => {
+        map.current!.getCanvas().style.cursor = '';
+      });
+      map.current!.on('mouseleave', circleId, () => {
+        map.current!.getCanvas().style.cursor = '';
+      });
     };
-  
+
     if (map.current.isStyleLoaded()) {
       addCircleLayer();
     } else {
       map.current.once("style.load", addCircleLayer);
     }
   }, [center, filterRadius]);
-  
 
   return <div ref={mapContainer} className="mapbox-container" />;
 };
