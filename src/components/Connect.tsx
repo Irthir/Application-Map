@@ -1,5 +1,6 @@
 import { useState } from "react"; // Ajoute cet import
 import { supabase } from "../services/Authentification";
+import toast from 'react-hot-toast';
 
 const Auth = () => {
   const [email, setEmail] = useState("");
