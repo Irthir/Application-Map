@@ -40,7 +40,6 @@ const Sidebar = ({
   setFilterRadius,
   onClearRecherche,
 }: SidebarProps) => {
-
   const [globalLoading, setGlobalLoading] = useState(false);
 
   const handleRadiusChange = (radius: number) => {
@@ -74,17 +73,18 @@ const Sidebar = ({
   };
 
   return (
-    <aside className="sidebar">
-      <h1 className="text-2xl font-bold mb-4">Application Map</h1>
+    <aside className="sidebar p-4 space-y-6">
+      <h1 className="text-2xl font-bold mb-4 text-center">Application Map</h1>
 
       {globalLoading && (
-        <div className="bg-blue-100 text-blue-700 p-2 mb-2 text-center text-sm rounded animate-pulse">
+        <div className="bg-blue-100 text-blue-700 p-2 text-center text-sm rounded animate-pulse">
           🔄 Recherche en cours...
         </div>
       )}
 
-      <section>
-        <h2 className="font-semibold mb-2">Recherche</h2>
+      {/* Recherche section */}
+      <section className="space-y-4 border-t pt-4">
+        <h2 className="text-lg font-semibold text-gray-700">🔎 Recherche</h2>
         <SearchAPE onResults={(data) => wrappedOnSearchResults(Promise.resolve(data))} />
         <FiltreSecteurs
           center={mapCenter}
@@ -94,41 +94,38 @@ const Sidebar = ({
         />
       </section>
 
-      <section className="mt-4">
-        <h2 className="font-semibold mb-2">Clients & Prospects</h2>
+      {/* Clients & Prospects section */}
+      <section className="space-y-4 border-t pt-4">
+        <h2 className="text-lg font-semibold text-gray-700">👥 Clients & Prospects</h2>
 
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2">
           <button
             onClick={onClearRecherche}
-            className="w-1/2 bg-red-100 text-red-700 py-1 rounded hover:bg-red-200"
+            className="flex-1 bg-red-100 text-red-700 py-2 rounded hover:bg-red-200 text-sm"
           >
             Supprimer "Recherche"
           </button>
 
           <button
             onClick={clearAllData}
-            className="w-1/2 bg-gray-200 text-gray-700 py-1 rounded hover:bg-gray-300"
+            className="flex-1 bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 text-sm"
           >
             <FaTrashAlt className="inline mr-1" /> Tout effacer
           </button>
         </div>
 
-        <ul className="text-sm space-y-1">
+        <ul className="text-sm space-y-2 max-h-72 overflow-y-auto pr-2">
           {data.map((item, i) => (
             <li
               key={i}
-              className="flex flex-col gap-1 p-2 rounded border border-gray-200 relative hover:shadow-md transition bg-white"
+              className="flex flex-col gap-1 p-2 rounded border border-gray-200 bg-white relative hover:shadow-md"
             >
-              <div className="text-left font-semibold">{item.Nom}</div>
+              <div className="font-semibold">{item.Nom}</div>
 
-              {item.Adresse && (
-                <div className="text-xs text-gray-600">{item.Adresse}</div>
-              )}
-              {item.Secteur && (
-                <div className="text-xs text-gray-500 italic">{item.Secteur}</div>
-              )}
+              {item.Adresse && <div className="text-xs text-gray-500">{item.Adresse}</div>}
+              {item.Secteur && <div className="text-xs italic text-gray-400">{item.Secteur}</div>}
 
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex gap-2 mt-1">
                 <button
                   onClick={() => onCenter(item.Latitude, item.Longitude)}
                   className="p-1 rounded bg-blue-100 hover:bg-blue-200"
@@ -167,13 +164,13 @@ const Sidebar = ({
               <div className="flex gap-2 mt-1 text-xs">
                 <button
                   onClick={() => onSetType(item.Nom, "Client")}
-                  className="bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                  className="flex-1 bg-green-100 text-green-700 py-1 rounded hover:bg-green-200"
                 >
                   Client
                 </button>
                 <button
                   onClick={() => onSetType(item.Nom, "Prospect")}
-                  className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded hover:bg-yellow-200"
+                  className="flex-1 bg-yellow-100 text-yellow-700 py-1 rounded hover:bg-yellow-200"
                 >
                   Prospect
                 </button>
@@ -181,8 +178,7 @@ const Sidebar = ({
 
               <button
                 onClick={() => onRemoveItem(item.Nom)}
-                className="absolute top-1 right-1 text-gray-400 hover:text-red-600 text-sm"
-                style={{ background: "transparent", border: "none" }}
+                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 text-lg"
                 title="Supprimer"
               >
                 <FaTimes />
@@ -192,21 +188,22 @@ const Sidebar = ({
         </ul>
       </section>
 
-      <section className="mt-4 space-y-2">
-        <h2 className="font-semibold mb-2">Exporter</h2>
+      {/* Export section */}
+      <section className="space-y-2 border-t pt-4">
+        <h2 className="text-lg font-semibold text-gray-700">📦 Exporter</h2>
 
         <button
           onClick={onExport}
-          className="w-full flex items-center justify-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+          className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded hover:from-blue-600 hover:to-blue-800"
         >
           <FaFileCsv className="mr-2" /> Exporter CSV
         </button>
 
         <button
           onClick={onDownloadTemplate}
-          className="w-full flex items-center justify-center bg-gray-200 text-black py-2 rounded hover:bg-gray-300"
+          className="w-full flex items-center justify-center bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200"
         >
-          <FaFileCsv className="mr-2" /> Télécharger modèle import
+          <FaFileCsv className="mr-2" /> Télécharger modèle
         </button>
       </section>
     </aside>

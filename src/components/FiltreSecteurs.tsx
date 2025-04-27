@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import nafCodes from "../data/naf-codes.json";
-import { FaChevronDown, FaChevronUp, FaSearch } from "react-icons/fa";
+import { FaChevronDown, FaChevronUp, FaSearch, FaBroom } from "react-icons/fa";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -14,6 +14,8 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [selectedNafs, setSelectedNafs] = useState<string[]>([]);
+  const [onlyActive, setOnlyActive] = useState(true);
+  const [onlyCompany, setOnlyCompany] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const filteredNaf = nafCodes.filter((n) =>
@@ -26,6 +28,11 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     setSelectedNafs((prev) =>
       prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
     );
+  };
+
+  const clearSelection = () => {
+    setSelectedNafs([]);
+    toast.success("✅ Sélection vidée !");
   };
 
   const handleSearch = async () => {
@@ -42,9 +49,8 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
       const allResults: any[] = [];
 
       for (const naf of selectedNafs) {
-        const res = await fetch(
-          `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}`
-        );
+        const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompany=${onlyCompany}`;
+        const res = await fetch(url);
 
         if (res.ok) {
           const data = await res.json();
@@ -95,7 +101,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
       </div>
 
       {expanded && (
-        <div className="max-h-64 overflow-y-auto border rounded p-2 grid grid-cols-2 gap-2">
+        <div className="max-h-64 overflow-y-auto border rounded p-2 grid grid-cols-3 gap-2">
           {filteredNaf.map((n) => (
             <label
               key={n.id}
@@ -113,22 +119,51 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         </div>
       )}
 
+      <div className="flex flex-col gap-2 mt-2 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={onlyActive}
+            onChange={() => setOnlyActive(prev => !prev)}
+          />
+          Entreprises actives uniquement
+        </label>
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={onlyCompany}
+            onChange={() => setOnlyCompany(prev => !prev)}
+          />
+          Seulement sociétés (catégorie juridique ≥ 2000)
+        </label>
+      </div>
+
       <input
         type="range"
         min="1"
         max="50"
         value={radius}
         onChange={(e) => onRadiusChange(Number(e.target.value))}
-        className="w-full mt-2"
+        className="w-full mt-4"
       />
 
-      <button
-        onClick={handleSearch}
-        disabled={loading}
-        className="mt-2 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-blue-400"
-      >
-        {loading ? "Recherche en cours..." : "Rechercher"}
-      </button>
+      <div className="flex flex-col gap-2 mt-4">
+        <button
+          onClick={handleSearch}
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800 disabled:opacity-50"
+        >
+          {loading ? "🔍 Recherche en cours..." : "🔎 Lancer la recherche"}
+        </button>
+
+        <button
+          onClick={clearSelection}
+          className="w-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-sm"
+        >
+          <FaBroom className="mr-2" /> Vider la sélection
+        </button>
+      </div>
     </div>
   );
 };
