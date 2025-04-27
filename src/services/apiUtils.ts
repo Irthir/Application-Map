@@ -1,7 +1,7 @@
 export const fetchCompanyBySIREN = async (siren: string) => {
-  //const formattedSiren = siren.replace(/\s+/g, ""); // Supprimer les espaces dans le SIREN
+  const formattedSiren = siren.replace(/\s+/g, ""); // Supprimer les espaces dans le SIREN
 
-  const response = await fetch(/*'http://localhost:5000*/'"https://application-map.onrender.com/api/insee/${formattedSiren}', {
+  const response = await fetch(`https://application-map.onrender.com/api/insee/${formattedSiren}`, {
     method: "GET",
     headers: {
       Accept: "application/json",
