@@ -15,7 +15,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
   const [expanded, setExpanded] = useState(false);
   const [selectedNafs, setSelectedNafs] = useState<string[]>([]);
   const [onlyActive, setOnlyActive] = useState(true);
-  const [onlyCompany, setOnlyCompany] = useState(true);
+  const [onlyCompanies, setOnlyCompanies] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const filteredNaf = nafCodes.filter((n) =>
@@ -49,7 +49,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
       const allResults: any[] = [];
 
       for (const naf of selectedNafs) {
-        const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompany=${onlyCompany}`;
+        const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompanies=${onlyCompanies}`;
         const res = await fetch(url);
 
         if (res.ok) {
@@ -77,7 +77,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">Filtrer par secteur d'activité</h3>
+      <h3 className="text-lg font-bold mb-2">🎯 Filtrer par secteur d'activité</h3>
 
       <div className="relative mb-2">
         <FaSearch className="absolute left-3 top-3 text-gray-400" />
@@ -85,7 +85,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher un secteur"
+          placeholder="🔎 Rechercher un secteur"
           className="pl-10 w-full border rounded p-2"
         />
       </div>
@@ -105,7 +105,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
           {filteredNaf.map((n) => (
             <label
               key={n.id}
-              className="flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer"
+              className="flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer text-sm"
             >
               <input
                 type="checkbox"
@@ -132,10 +132,10 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
-            checked={onlyCompany}
-            onChange={() => setOnlyCompany(prev => !prev)}
+            checked={onlyCompanies}
+            onChange={() => setOnlyCompanies(prev => !prev)}
           />
-          Seulement sociétés (catégorie juridique ≥ 2000)
+          Seulement sociétés (cat. juridique ≥ 2000)
         </label>
       </div>
 
