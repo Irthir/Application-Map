@@ -1,7 +1,7 @@
 import { useState } from "react";
 import SearchAPE from "./SearchAPE";
 import FiltreSecteurs from "./FiltreSecteurs";
-import { FaEye, FaEyeSlash, FaMapMarkerAlt, FaTimes, FaFileCsv } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaMapMarkerAlt, FaTimes, FaFileCsv, FaTrashAlt } from "react-icons/fa";
 import { DataPoint } from "../type.ts";
 import { toast } from "react-hot-toast";
 
@@ -25,6 +25,7 @@ interface SidebarProps {
 
 const Sidebar = ({
   data,
+  onUpload,
   onFilter,
   onSearchResults,
   onCenter,
@@ -39,6 +40,7 @@ const Sidebar = ({
   setFilterRadius,
   onClearRecherche,
 }: SidebarProps) => {
+
   const [globalLoading, setGlobalLoading] = useState(false);
 
   const handleRadiusChange = (radius: number) => {
@@ -61,6 +63,13 @@ const Sidebar = ({
       toast.error("❗ Erreur lors du traitement des résultats.");
     } finally {
       setGlobalLoading(false);
+    }
+  };
+
+  const clearAllData = () => {
+    if (confirm("Voulez-vous vraiment tout supprimer ?")) {
+      onUpload([]);
+      toast.success("🗑️ Données effacées !");
     }
   };
 
@@ -88,12 +97,21 @@ const Sidebar = ({
       <section className="mt-4">
         <h2 className="font-semibold mb-2">Clients & Prospects</h2>
 
-        <button
-          onClick={onClearRecherche}
-          className="mb-2 w-full bg-red-100 text-red-700 py-1 rounded hover:bg-red-200"
-        >
-          Supprimer les marqueurs de type "Recherche"
-        </button>
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={onClearRecherche}
+            className="w-1/2 bg-red-100 text-red-700 py-1 rounded hover:bg-red-200"
+          >
+            Supprimer "Recherche"
+          </button>
+
+          <button
+            onClick={clearAllData}
+            className="w-1/2 bg-gray-200 text-gray-700 py-1 rounded hover:bg-gray-300"
+          >
+            <FaTrashAlt className="inline mr-1" /> Tout effacer
+          </button>
+        </div>
 
         <ul className="text-sm space-y-1">
           {data.map((item, i) => (

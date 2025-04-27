@@ -38,7 +38,7 @@ const App = () => {
         toast.error("❗ Secteur d’activité non défini.");
         return;
       }
-  
+
       try {
         const res = await fetch(
           `https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(nafCode)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius || 10}`
@@ -51,7 +51,7 @@ const App = () => {
         toast.error("❗ Erreur lors de la recherche de secteurs similaires.");
       }
     };
-  
+
     window.addEventListener("search-similar", listener);
     return () => window.removeEventListener("search-similar", listener);
   }, [data, filterRadius]);
@@ -86,7 +86,7 @@ const App = () => {
             Longitude: entry.Longitude,
             Adresse: entry.adresse || "",
             Secteur: entry.secteur || "",
-            CodeNAF: entry.codeNAF || "",  // ✅ Ajout sécurisé ici
+            CodeNAF: entry.codeNAF || "",
             Type: entry.Type || "Recherche",
           });
         }
@@ -97,11 +97,22 @@ const App = () => {
 
     if (newEntries.length > 0) {
       setData(prev => [...prev, ...newEntries]);
-      setMapCenter([newEntries[0].Longitude, newEntries[0].Latitude]);
+      autoCenter(newEntries);
       setUnsavedChanges(true);
       toast.success(`✅ ${newEntries.length} établissement(s) trouvé(s) et ajouté(s)`);
     } else {
       toast.error("❗ Aucun établissement trouvé correspondant à votre recherche.");
+    }
+  };
+
+  // 🧠 Nouvelle fonction : centre automatiquement sur le milieu des nouveaux points
+  const autoCenter = (entries: DataPoint[]) => {
+    if (entries.length === 1) {
+      setMapCenter([entries[0].Longitude, entries[0].Latitude]);
+    } else {
+      const avgLat = entries.reduce((sum, e) => sum + e.Latitude, 0) / entries.length;
+      const avgLon = entries.reduce((sum, e) => sum + e.Longitude, 0) / entries.length;
+      setMapCenter([avgLon, avgLat]);
     }
   };
 

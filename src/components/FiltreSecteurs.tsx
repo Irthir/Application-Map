@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import nafCodes from "../data/naf-codes.json";
-import { FaChevronDown, FaChevronUp, FaStar, FaRegStar, FaSearch } from "react-icons/fa";
-import toast from 'react-hot-toast';
+import { FaChevronDown, FaChevronUp, FaSearch } from "react-icons/fa";
+import toast from "react-hot-toast";
 
 interface Props {
   center: [number, number];
@@ -13,55 +13,57 @@ interface Props {
 const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRadiusChange }) => {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [selectedNaf, setSelectedNaf] = useState<string>("");
+  const [selectedNafs, setSelectedNafs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("favNaf");
-    if (stored) {
-      setFavorites(JSON.parse(stored));
-    }
-  }, []);
-
-  const toggleFavorite = (id: string) => {
-    let updated: string[];
-    if (favorites.includes(id)) {
-      updated = favorites.filter(fav => fav !== id);
-    } else {
-      updated = [...favorites, id];
-    }
-    setFavorites(updated);
-    localStorage.setItem("favNaf", JSON.stringify(updated));
-  };
 
   const filteredNaf = nafCodes.filter((n) =>
     n.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  const baseUrl = "https://application-map.onrender.com";//"http://localhost:5000"; // Peut aussi être mis dynamiquement selon l'environnement
+  const baseUrl = "https://application-map.onrender.com";
+
+  const toggleNaf = (id: string) => {
+    setSelectedNafs((prev) =>
+      prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
+    );
+  };
 
   const handleSearch = async () => {
-    if (!selectedNaf) return;
+    if (selectedNafs.length === 0) {
+      toast.error("❗ Sélectionnez au moins un secteur d'activité !");
+      return;
+    }
+
     const [lng, lat] = center;
-
     setLoading(true);
-    try {
-      const res = await fetch(
-        `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}`
-      );
+    toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
 
-      if (!res.ok) {
-        throw new Error("Erreur lors de la récupération des données INSEE");
+    try {
+      const allResults: any[] = [];
+
+      for (const naf of selectedNafs) {
+        const res = await fetch(
+          `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}`
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          allResults.push(...data);
+        } else {
+          console.error(`Erreur pour le NAF ${naf}`);
+        }
       }
 
-      const data = await res.json();
-      onSearchResults(data);
-      toast.success(`✅ ${data.length} entreprise(s) trouvée(s) !`);
+      onSearchResults(allResults);
+
+      if (allResults.length > 0) {
+        toast.success(`✅ ${allResults.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
+      } else {
+        toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
+      }
     } catch (error) {
       console.error("Erreur INSEE:", error);
-      //alert("Erreur lors de la récupération des données INSEE.");
-      toast.error("Erreur lors de la récupération des données INSEE.");
+      toast.error("Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
     } finally {
       setLoading(false);
     }
@@ -94,50 +96,19 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
 
       {expanded && (
         <div className="max-h-64 overflow-y-auto border rounded p-2 space-y-1">
-          {favorites.length > 0 && (
-            <>
-              <div className="text-sm text-gray-600 font-bold mb-1">Favoris :</div>
-              {favorites.map((id) => {
-                const naf = nafCodes.find((n) => n.id === id);
-                return naf ? (
-                  <div
-                    key={naf.id}
-                    className={`flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer ${
-                      selectedNaf === naf.id ? "bg-blue-100" : ""
-                    }`}
-                    onClick={() => setSelectedNaf(naf.id)}
-                  >
-                    <FaStar className="text-yellow-400" />
-                    {naf.label}
-                  </div>
-                ) : null;
-              })}
-              <hr className="my-2" />
-            </>
-          )}
-
           {filteredNaf.map((n) => (
-            <div
+            <label
               key={n.id}
-              className={`flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer ${
-                selectedNaf === n.id ? "bg-blue-100" : ""
-              }`}
-              onClick={() => setSelectedNaf(n.id)}
+              className="flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer"
             >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleFavorite(n.id);
-                }}
-              >
-                {favorites.includes(n.id) ? (
-                  <FaStar className="text-yellow-400" />
-                ) : (
-                  <FaRegStar className="text-gray-400" />
-                )}
-              </button>
+              <input
+                type="checkbox"
+                value={n.id}
+                checked={selectedNafs.includes(n.id)}
+                onChange={() => toggleNaf(n.id)}
+              />
               {n.label}
-            </div>
+            </label>
           ))}
         </div>
       )}
