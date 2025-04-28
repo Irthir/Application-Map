@@ -18,8 +18,8 @@ interface SidebarProps {
   onDownloadTemplate: () => void;
   onRemoveItem: (nom: string) => void;
   mapCenter: [number, number];
-  filterRadius: number | null;
-  setFilterRadius: (radius: number | null) => void;
+  filterRadius: number;
+  setFilterRadius: (radius: number) => void;
   onClearRecherche: () => void;
 }
 
@@ -146,17 +146,28 @@ const Sidebar = ({
                   )}
                 </button>
 
-                {item.CodeNAF && (
+                {/* Correction ici : vérifier si le code NAF est valide avant de chercher similaires */}
+                {item.CodeNAF && item.CodeNAF.length >= 5 ? (
                   <button
                     onClick={() =>
                       window.dispatchEvent(
-                        new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.CodeNAF } })
+                        new CustomEvent("search-similar", {
+                          detail: { nom: item.Nom, naf: item.CodeNAF },
+                        })
                       )
                     }
                     className="p-1 rounded bg-indigo-100 hover:bg-indigo-200 text-xs"
                     title="Rechercher similaires"
                   >
                     🔍 Similaires
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => toast.error("❗ Aucun code NAF valide pour cette entreprise")}
+                    className="p-1 rounded bg-gray-100 text-gray-400 text-xs"
+                    title="Code NAF manquant"
+                  >
+                    🚫
                   </button>
                 )}
               </div>

@@ -80,7 +80,7 @@ app.get("/api/insee-activite", async (req, res) => {
     const filterActive = onlyActive === "true";
     const filterCompany = onlyCompanies === "true";
 
-    const query = `periode(activitePrincipaleEtablissement:${naf})`;
+    const query = `periode(activitePrincipaleEtablissement:${naf})`; // on va aussi checker secondaire après
     const pageSize = 1000;
     let allEtablissements = [];
     let start = 0;
@@ -116,8 +116,9 @@ app.get("/api/insee-activite", async (req, res) => {
       if (etablissements.length < pageSize) break;
     }
 
-    console.log(`✨ Total établissements chargés: ${allEtablissements.length}`);
+    console.log(`✨ Total établissements récupérés: ${allEtablissements.length}`);
 
+    // 🔥 Nouvelle logique : si pas trouvé dans activité principale, chercher aussi dans secondaires
     const filtered = allEtablissements.map((e) => {
       let latWGS, lonWGS, distance = null;
 
@@ -140,6 +141,21 @@ app.get("/api/insee-activite", async (req, res) => {
         if (isNaN(distance) || distance > radiusNum) return null;
       } else {
         console.warn(`⚠️ Pas de coordonnées pour ${e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale}`);
+        return null;
+      }
+
+      // 🔎 Vérifie si l'élément match en secondaire aussi
+      const activitesSecondaires = e.periodesEtablissement?.[0]?.activitePrincipaleEtablissement
+        ? [e.periodesEtablissement[0].activitePrincipaleEtablissement]
+        : [];
+
+      if (e.periodesEtablissement?.[0]?.activitesSecondairesEtablissement) {
+        const secondaires = e.periodesEtablissement[0].activitesSecondairesEtablissement.map(a => a.activiteSecondaireEtablissement);
+        activitesSecondaires.push(...secondaires);
+      }
+
+      if (!activitesSecondaires.includes(naf)) {
+        return null;
       }
 
       return {
@@ -148,13 +164,13 @@ app.get("/api/insee-activite", async (req, res) => {
         Commune: e.adresseEtablissement.libelleCommuneEtablissement || "Commune inconnue",
         CodeCommune: e.adresseEtablissement.codeCommuneEtablissement,
         Type: "Recherche",
-        Distance: distance ? distance.toFixed(2) : "??",
+        Distance: distance.toFixed(2),
         adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`.trim(),
-        secteur: e.periodesEtablissement?.[0]?.activitePrincipaleEtablissement || "",
+        secteur: activitesSecondaires.join(", "), // toutes les activités listées
       };
     }).filter(Boolean);
 
-    console.log(`✅ Établissements après filtrage distance: ${filtered.length}`);
+    console.log(`✅ Établissements après filtrage par distance et secteurs secondaires: ${filtered.length}`);
     res.json(filtered);
 
   } catch (error) {
@@ -163,6 +179,7 @@ app.get("/api/insee-activite", async (req, res) => {
   }
 });
 
+// Autre route inchangée
 app.get("/api/insee/:siren", async (req, res) => {
   try {
     await ensureToken();

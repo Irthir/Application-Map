@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import nafCodes from "../data/naf-codes-enriched.json"; // ✅ nouveau fichier enrichi
+import nafCodes from "../data/naf-codes-enriched.json"; // ✅ version enrichie
 import { FaChevronDown, FaChevronUp, FaSearch, FaBroom } from "react-icons/fa";
 import toast from "react-hot-toast";
 
@@ -48,7 +48,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     try {
       const allNafToSearch = new Set<string>();
 
-      // Ajouter naf sélectionnés + leurs related codes
+      // ✅ Récupérer aussi les related codes
       selectedNafs.forEach(id => {
         const naf = nafCodes.find((n) => n.id === id);
         if (naf) {
@@ -60,8 +60,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
       });
 
       const allResults: any[] = [];
-
-      for (const naf of allNafToSearch) {
+      const promises = Array.from(allNafToSearch).map(async (naf) => {
         const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompanies=${onlyCompanies}`;
         const res = await fetch(url);
 
@@ -71,7 +70,9 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         } else {
           console.error(`Erreur pour le NAF ${naf}`);
         }
-      }
+      });
+
+      await Promise.all(promises); // ✅ attendre toutes les recherches en parallèle
 
       onSearchResults(allResults);
 
@@ -92,6 +93,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     <div className="mb-4">
       <h3 className="text-lg font-bold mb-2">🎯 Filtrer par secteur d'activité</h3>
 
+      {/* Barre de recherche */}
       <div className="relative mb-2">
         <FaSearch className="absolute left-3 top-3 text-gray-400" />
         <input
@@ -103,16 +105,18 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         />
       </div>
 
+      {/* Paramètres */}
       <div className="flex justify-between items-center mb-2">
         <label className="font-medium">Rayon : {radius} km</label>
         <button
-          onClick={() => setExpanded((prev) => !prev)}
+          onClick={() => setExpanded(prev => !prev)}
           className="text-blue-600"
         >
           {expanded ? <FaChevronUp /> : <FaChevronDown />}
         </button>
       </div>
 
+      {/* Liste des secteurs */}
       {expanded && (
         <div className="max-h-64 overflow-y-auto border rounded p-2 grid grid-cols-3 gap-2">
           {filteredNaf.map((n) => (
@@ -132,6 +136,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         </div>
       )}
 
+      {/* Filtres supplémentaires */}
       <div className="flex flex-col gap-2 mt-2 text-sm">
         <label className="flex items-center gap-2">
           <input
@@ -152,6 +157,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         </label>
       </div>
 
+      {/* Slider de rayon */}
       <input
         type="range"
         min="1"
@@ -161,6 +167,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         className="w-full mt-4"
       />
 
+      {/* Boutons actions */}
       <div className="flex flex-col gap-2 mt-4">
         <button
           onClick={handleSearch}

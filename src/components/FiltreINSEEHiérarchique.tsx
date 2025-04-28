@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import nafCodes from "../data/naf-codes-enriched.json"; // ✅ enrichi
-import toast from 'react-hot-toast';
+import nafCodes from "../data/naf-codes-enriched.json"; // ✅ version enrichie
+import toast from "react-hot-toast";
 
 interface NafCode {
   id: string;
@@ -27,57 +27,37 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const baseUrl = "https://application-map.onrender.com";
 
   useEffect(() => {
-    const filtered = nafCodes.filter((code) => code.id.includes("."));
-    setNafList(filtered);
+    // Optionnel : on peut filtrer uniquement les niveaux détaillés (ex: 01.13Z et pas 01)
+    const detailedCodes = nafCodes.filter((code) => code.id.includes("."));
+    setNafList(detailedCodes);
   }, []);
 
   const handleSearch = async () => {
     if (!selectedNaf) {
-      toast.error("❗ Sélectionnez un secteur d'activité !");
+      toast.error("❗ Veuillez sélectionner un secteur !");
       return;
     }
 
     const [lng, lat] = center;
     setLoading(true);
-    toast.loading("🔎 Recherche secteur...", { id: "search-loading" });
+    toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
 
     try {
-      const nafEntry = nafCodes.find((n) => n.id === selectedNaf);
-      if (!nafEntry) {
-        toast.error("❗ Code APE non trouvé.", { id: "search-loading" });
-        return;
-      }
+      const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=true&onlyCompanies=true`;
+      const res = await fetch(url);
 
-      const codesToSearch = new Set<string>([nafEntry.id]);
-      if (nafEntry.related) {
-        nafEntry.related.forEach(r => codesToSearch.add(r));
-      }
+      if (!res.ok) throw new Error("Erreur serveur INSEE");
 
-      const allResults: any[] = [];
-
-      for (const naf of codesToSearch) {
-        const res = await fetch(
-          `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          allResults.push(...data);
-        } else {
-          console.error(`Erreur pour le code ${naf}`);
-        }
-      }
-
-      if (allResults.length > 0) {
-        toast.success(`✅ ${allResults.length} établissement(s) trouvé(s) !`, { id: "search-loading" });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        onSearchResults(data);
+        toast.success(`✅ ${data.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
       } else {
         toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
       }
-
-      onSearchResults(allResults);
-
     } catch (error) {
       console.error("Erreur INSEE :", error);
-      toast.error("❗ Erreur lors de la recherche INSEE.", { id: "search-loading" });
+      toast.error("Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
     } finally {
       setLoading(false);
     }
@@ -85,7 +65,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
 
   return (
     <div className="mb-4">
-      <h3 className="text-lg font-bold mb-2">🏢 Recherche Hiérarchique</h3>
+      <h3 className="font-semibold mb-2">🏭 Filtrer par industrie (NAF)</h3>
 
       <select
         value={selectedNaf}
@@ -93,9 +73,9 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
         className="w-full border rounded p-2 mb-2"
       >
         <option value="">Sélectionner un secteur</option>
-        {nafList.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.id} - {c.label}
+        {nafList.map((naf) => (
+          <option key={naf.id} value={naf.id}>
+            {naf.id} - {naf.label}
           </option>
         ))}
       </select>
@@ -116,9 +96,9 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
       <button
         onClick={handleSearch}
         disabled={loading}
-        className="bg-gradient-to-r from-blue-500 to-blue-700 text-white w-full py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800 disabled:bg-gray-400"
+        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        {loading ? "🔄 Recherche..." : "🔎 Lancer la recherche"}
+        {loading ? "🔍 Recherche..." : "🔎 Rechercher"}
       </button>
     </div>
   );

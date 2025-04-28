@@ -66,13 +66,13 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
       let color;
       switch (item.Type) {
         case "Client":
-          color = "#10B981";
+          color = "#10B981"; // vert
           break;
         case "Prospect":
-          color = "#F59E0B";
+          color = "#F59E0B"; // jaune
           break;
         default:
-          color = "#9CA3AF";
+          color = "#9CA3AF"; // gris
       }
 
       const marker = new mapboxgl.Marker({ color })
@@ -80,13 +80,13 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
         .setPopup(
           new mapboxgl.Popup({ offset: 25 }).setHTML(
             `<div class="popup-content">
-              <strong>${item.Nom}</strong><br>
-              Type: ${item.Type || "Non marqué"}<br>
+              <strong>${item.Nom}</strong><br/>
+              Type: ${item.Type || "Non marqué"}<br/>
               <button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: { nom: '${item.Nom}', naf: '${item.Type}' } }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>
             </div>`
           )
         )
-        .addTo(map.current!);
+        .addTo(map.current!); // ✅ protection anti-null ici !
 
       markersRef.current.push(marker);
     });
@@ -106,12 +106,12 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
         units: "kilometers",
       });
 
-      map.current?.addSource(circleId, {
+      map.current!.addSource(circleId, {
         type: "geojson",
         data: circle,
       });
 
-      map.current?.addLayer({
+      map.current!.addLayer({
         id: circleId,
         type: "fill",
         source: circleId,

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import nafCodes from "../data/naf-codes-enriched.json"; // ✅ nouvelle source enrichie
-import toast from 'react-hot-toast';
+import nafCodes from "../data/naf-codes-enriched.json"; // ✅ version enrichie
+import toast from "react-hot-toast";
 
 interface Props {
   center: [number, number];
@@ -10,61 +10,44 @@ interface Props {
 const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
   const [selectedNaf, setSelectedNaf] = useState("");
   const [radius, setRadius] = useState(5);
+  const [loading, setLoading] = useState(false);
 
   const baseUrl = "https://application-map.onrender.com";
 
   const handleSearch = async () => {
     if (!selectedNaf) {
-      toast.error("❗ Veuillez choisir un secteur.");
+      toast.error("❗ Veuillez sélectionner un secteur !");
       return;
     }
 
-    const [lon, lat] = center;
-    toast.loading("🔎 Recherche...", { id: "search-loading" });
+    const [lng, lat] = center;
+    setLoading(true);
+    toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
 
     try {
-      const nafEntry = nafCodes.find((n) => n.id === selectedNaf);
-      if (!nafEntry) {
-        toast.error("❗ Code APE non trouvé.");
-        return;
-      }
+      const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=true&onlyCompanies=true`;
+      const res = await fetch(url);
 
-      const codesToSearch = new Set<string>([nafEntry.id]);
-      if (nafEntry.related) {
-        nafEntry.related.forEach(r => codesToSearch.add(r));
-      }
+      if (!res.ok) throw new Error("Erreur serveur INSEE");
 
-      const allResults: any[] = [];
-
-      for (const naf of codesToSearch) {
-        const res = await fetch(
-          `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lon}&radius=${radius}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          allResults.push(...data);
-        } else {
-          console.error(`Erreur pour le code ${naf}`);
-        }
-      }
-
-      if (allResults.length > 0) {
-        toast.success(`✅ ${allResults.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        onSearchResults(data);
+        toast.success(`✅ ${data.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
       } else {
         toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
       }
-
-      onSearchResults(allResults);
-
     } catch (error) {
       console.error("Erreur INSEE :", error);
-      toast.error("❗ Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
+      toast.error("Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="mb-4">
-      <h3 className="text-lg font-bold mb-2">🔎 Recherche par Code APE</h3>
+      <h3 className="font-semibold mb-2">🔎 Filtrer par activité INSEE</h3>
 
       <select
         value={selectedNaf}
@@ -91,9 +74,10 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
 
       <button
         onClick={handleSearch}
-        className="bg-gradient-to-r from-blue-500 to-blue-700 text-white w-full py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800"
+        disabled={loading}
+        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        Lancer la recherche
+        {loading ? "🔍 Recherche..." : "🔎 Rechercher"}
       </button>
     </div>
   );
