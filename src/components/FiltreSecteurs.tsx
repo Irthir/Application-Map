@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import nafCodes from "../data/naf-codes.json";
+import nafCodes from "../data/naf-codes-enriched.json"; // ✅ nouveau fichier enrichi
 import { FaChevronDown, FaChevronUp, FaSearch, FaBroom } from "react-icons/fa";
 import toast from "react-hot-toast";
 
@@ -18,11 +18,11 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
   const [onlyCompanies, setOnlyCompanies] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  const baseUrl = "https://application-map.onrender.com";
+
   const filteredNaf = nafCodes.filter((n) =>
     n.label.toLowerCase().includes(search.toLowerCase())
   );
-
-  const baseUrl = "https://application-map.onrender.com";
 
   const toggleNaf = (id: string) => {
     setSelectedNafs((prev) =>
@@ -46,9 +46,22 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
 
     try {
+      const allNafToSearch = new Set<string>();
+
+      // Ajouter naf sélectionnés + leurs related codes
+      selectedNafs.forEach(id => {
+        const naf = nafCodes.find((n) => n.id === id);
+        if (naf) {
+          allNafToSearch.add(naf.id);
+          if (naf.related) {
+            naf.related.forEach(rel => allNafToSearch.add(rel));
+          }
+        }
+      });
+
       const allResults: any[] = [];
 
-      for (const naf of selectedNafs) {
+      for (const naf of allNafToSearch) {
         const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompanies=${onlyCompanies}`;
         const res = await fetch(url);
 

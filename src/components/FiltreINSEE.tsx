@@ -1,61 +1,71 @@
 import React, { useState } from "react";
-import nafCodes from "../data/naf-codes.json";
+import nafCodes from "../data/naf-codes-enriched.json"; // ✅ nouvelle source enrichie
 import toast from 'react-hot-toast';
 
 interface Props {
-  center: [number, number]; // [lng, lat]
+  center: [number, number];
   onSearchResults: (data: any[]) => void;
 }
 
 const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
   const [selectedNaf, setSelectedNaf] = useState("");
-  const [radius, setRadius] = useState(5); // en km
+  const [radius, setRadius] = useState(5);
 
-  //const isDev = import.meta.env.DEV;
-  const baseUrl = "https://application-map.onrender.com";//"http://localhost:5000";
+  const baseUrl = "https://application-map.onrender.com";
 
   const handleSearch = async () => {
-    if (!selectedNaf) return;
+    if (!selectedNaf) {
+      toast.error("❗ Veuillez choisir un secteur.");
+      return;
+    }
 
     const [lon, lat] = center;
+    toast.loading("🔎 Recherche...", { id: "search-loading" });
 
     try {
-      const res = await fetch(
-        `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(
-          selectedNaf
-        )}&lat=${lat}&lng=${lon}&radius=${radius}`
-      );
-
-      if (!res.ok) throw new Error("Erreur lors de la récupération des données INSEE");
-
-      const data = await res.json();
-      if (!Array.isArray(data)) {
-        console.error("Données INSEE inattendues", data);
+      const nafEntry = nafCodes.find((n) => n.id === selectedNaf);
+      if (!nafEntry) {
+        toast.error("❗ Code APE non trouvé.");
         return;
-      }      
-      const result = data.map((e: any) => ({
-        Nom: e.Nom,
-        Latitude: e.latitude ?? e.lat ?? 0,
-        Longitude: e.longitude ?? e.lon ?? 0,
-        Type: "Recherche",
-      }));
-
-      if (result.length === 0) {
-        //alert("Aucune entreprise trouvée pour ce code APE et ce rayon.");
-        toast.error("Aucune entreprise trouvée pour ce code APE et ce rayon.");
       }
 
-      onSearchResults(result);
+      const codesToSearch = new Set<string>([nafEntry.id]);
+      if (nafEntry.related) {
+        nafEntry.related.forEach(r => codesToSearch.add(r));
+      }
+
+      const allResults: any[] = [];
+
+      for (const naf of codesToSearch) {
+        const res = await fetch(
+          `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lon}&radius=${radius}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          allResults.push(...data);
+        } else {
+          console.error(`Erreur pour le code ${naf}`);
+        }
+      }
+
+      if (allResults.length > 0) {
+        toast.success(`✅ ${allResults.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
+      } else {
+        toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
+      }
+
+      onSearchResults(allResults);
+
     } catch (error) {
       console.error("Erreur INSEE :", error);
-      //alert("Erreur lors de la récupération des données INSEE.");
-      toast.error("Erreur lors de la récupération des données INSEE.");
+      toast.error("❗ Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
     }
   };
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">Filtrer par activité INSEE</h3>
+      <h3 className="text-lg font-bold mb-2">🔎 Recherche par Code APE</h3>
+
       <select
         value={selectedNaf}
         onChange={(e) => setSelectedNaf(e.target.value)}
@@ -81,9 +91,9 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
 
       <button
         onClick={handleSearch}
-        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700"
+        className="bg-gradient-to-r from-blue-500 to-blue-700 text-white w-full py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800"
       >
-        Rechercher
+        Lancer la recherche
       </button>
     </div>
   );

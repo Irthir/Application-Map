@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import nafCodes from "../data/naf-codes.json";
+import nafCodes from "../data/naf-codes-enriched.json"; // ✅ enrichi
 import toast from 'react-hot-toast';
 
 interface NafCode {
@@ -24,8 +24,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const [selectedNaf, setSelectedNaf] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  //const isDev = import.meta.env.DEV;
-  const baseUrl = "https://application-map.onrender.com";//"http://localhost:5000";
+  const baseUrl = "https://application-map.onrender.com";
 
   useEffect(() => {
     const filtered = nafCodes.filter((code) => code.id.includes("."));
@@ -33,32 +32,52 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   }, []);
 
   const handleSearch = async () => {
-    if (!selectedNaf) return;
-    const [lng, lat] = center;
+    if (!selectedNaf) {
+      toast.error("❗ Sélectionnez un secteur d'activité !");
+      return;
+    }
 
+    const [lng, lat] = center;
     setLoading(true);
-    console.log(`🔍 Recherche secteur ${selectedNaf} à la position: ${lat}, ${lng}`);
+    toast.loading("🔎 Recherche secteur...", { id: "search-loading" });
 
     try {
-      const res = await fetch(
-        `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(
-          selectedNaf
-        )}&lat=${lat}&lng=${lng}&radius=${radius}`
-      );
-
-      if (!res.ok) throw new Error("Erreur lors de la récupération des données INSEE");
-      const data = await res.json();
-
-      if (data.length === 0) {
-        //alert("Aucun établissement trouvé. Essayez d'élargir le rayon ou de changer de secteur.");
-        toast.error("Aucun établissement trouvé. Essayez d'élargir le rayon ou de changer de secteur.");
+      const nafEntry = nafCodes.find((n) => n.id === selectedNaf);
+      if (!nafEntry) {
+        toast.error("❗ Code APE non trouvé.", { id: "search-loading" });
+        return;
       }
 
-      onSearchResults(data);
+      const codesToSearch = new Set<string>([nafEntry.id]);
+      if (nafEntry.related) {
+        nafEntry.related.forEach(r => codesToSearch.add(r));
+      }
+
+      const allResults: any[] = [];
+
+      for (const naf of codesToSearch) {
+        const res = await fetch(
+          `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          allResults.push(...data);
+        } else {
+          console.error(`Erreur pour le code ${naf}`);
+        }
+      }
+
+      if (allResults.length > 0) {
+        toast.success(`✅ ${allResults.length} établissement(s) trouvé(s) !`, { id: "search-loading" });
+      } else {
+        toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
+      }
+
+      onSearchResults(allResults);
+
     } catch (error) {
       console.error("Erreur INSEE :", error);
-      //alert("Impossible de récupérer les données INSEE.");
-      toast.error("Impossible de récupérer les données INSEE.");
+      toast.error("❗ Erreur lors de la recherche INSEE.", { id: "search-loading" });
     } finally {
       setLoading(false);
     }
@@ -66,7 +85,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">Filtrer par industrie</h3>
+      <h3 className="text-lg font-bold mb-2">🏢 Recherche Hiérarchique</h3>
 
       <select
         value={selectedNaf}
@@ -84,6 +103,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
       <label className="block mb-2 text-sm font-medium text-gray-700">
         Rayon de recherche : {radius} km
       </label>
+
       <input
         type="range"
         min="1"
@@ -96,9 +116,9 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
       <button
         onClick={handleSearch}
         disabled={loading}
-        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 disabled:bg-blue-300"
+        className="bg-gradient-to-r from-blue-500 to-blue-700 text-white w-full py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800 disabled:bg-gray-400"
       >
-        {loading ? "Recherche..." : "Rechercher"}
+        {loading ? "🔄 Recherche..." : "🔎 Lancer la recherche"}
       </button>
     </div>
   );
