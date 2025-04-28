@@ -2,19 +2,19 @@ import { useEffect, useState, useCallback } from "react";
 import Map from "./components/Map";
 import Sidebar from "./components/Sidebar";
 import ImportCSV from "./components/Import";
-import { DataPoint } from "./type.ts";
+import { DataPoint } from "./type";
 import { Toaster, toast } from "react-hot-toast";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./App.css";
 
 const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
-  const [filterRadius, setFilterRadius] = useState<number>(5); // 🔵 valeur par défaut à 5km
+  const [filterRadius, setFilterRadius] = useState<number>(5);
   const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]); // Paris
+  const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
 
-  // 💾 Alerte de fermeture si des changements non sauvegardés
+  // 💾 Alerte fermeture si changements non sauvegardés
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (unsavedChanges) {
@@ -26,7 +26,7 @@ const App = () => {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [unsavedChanges]);
 
-  // 🔎 Écouteur pour rechercher des entreprises similaires
+  // 🔎 Recherche similaire par évènement
   useEffect(() => {
     const handleSearchSimilar = async (e: Event) => {
       const { nom, naf } = (e as CustomEvent<{ nom: string; naf: string }>).detail;
@@ -47,7 +47,7 @@ const App = () => {
         handleSearchResults(entreprises);
       } catch (err) {
         console.error("Erreur recherche similaire :", err);
-        toast.error("❗ Erreur recherche similaire.");
+        toast.error("❗ Erreur lors de la recherche similaire.");
       }
     };
 
@@ -55,8 +55,8 @@ const App = () => {
     return () => window.removeEventListener("search-similar", handleSearchSimilar);
   }, [data, filterRadius]);
 
-  // 📌 Gérer les nouveaux résultats de recherche
-  const handleSearchResults = useCallback(async (results: any[]) => {
+  // 📥 Traitement des résultats de recherche
+  const handleSearchResults = useCallback((results: any[]) => {
     removeRechercheMarkers();
 
     const newEntries: DataPoint[] = results
@@ -81,9 +81,9 @@ const App = () => {
     }
   }, []);
 
-  // 🎯 Centrage automatique des marqueurs
+  // 🎯 Centrage automatique
   const autoCenter = (entries: DataPoint[]) => {
-    if (!entries.length) return;
+    if (entries.length === 0) return;
     const avgLat = entries.reduce((sum, e) => sum + e.Latitude, 0) / entries.length;
     const avgLon = entries.reduce((sum, e) => sum + e.Longitude, 0) / entries.length;
     setMapCenter([avgLon, avgLat]);
@@ -92,29 +92,24 @@ const App = () => {
   // 🗺️ Actions sur la carte
   const handleCenterMap = (lat: number, lon: number) => setMapCenter([lon, lat]);
   const toggleMarkerVisibility = (nom: string) => {
-    setHiddenMarkers(prev =>
-      prev.includes(nom) ? prev.filter(n => n !== nom) : [...prev, nom]
-    );
+    setHiddenMarkers(prev => prev.includes(nom) ? prev.filter(n => n !== nom) : [...prev, nom]);
   };
 
-  // 🗑️ Nettoyage des résultats "Recherche"
   const removeRechercheMarkers = () => {
     setData(prev => prev.filter(d => d.Type !== "Recherche"));
   };
 
-  // 💾 Marquer un client ou prospect
-  const handleSetType = (nom: string, type: "Client" | "Prospect" | "") => {
+  // 🔵 Actions utilisateurs
+  const handleSetType = (nom: string, type: "Client" | "Prospect") => {
     setData(prev => prev.map(d => d.Nom === nom ? { ...d, Type: type } : d));
     setUnsavedChanges(true);
   };
 
-  // ❌ Suppression d'une entreprise
   const handleRemoveItem = (nom: string) => {
     setData(prev => prev.filter(d => d.Nom !== nom));
     setUnsavedChanges(true);
   };
 
-  // 📥 Import CSV
   const handleUpload = (uploadedData: any[]) => {
     const formatted = uploadedData.map((item) => ({
       Nom: item.Nom,
@@ -130,7 +125,6 @@ const App = () => {
     toast.success(`✅ ${formatted.length} entrée(s) importée(s)`);
   };
 
-  // 📤 Export CSV
   const handleExport = () => {
     const markedData = data.filter(d => d.Type === "Client" || d.Type === "Prospect");
     if (!markedData.length) {
@@ -154,7 +148,6 @@ const App = () => {
     toast.success("✅ Export CSV effectué !");
   };
 
-  // 📥 Télécharger un modèle vide
   const handleDownloadTemplate = () => {
     const csvContent = "Nom,Latitude,Longitude,Type,Adresse,Secteur,CodeNAF\n";
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -172,7 +165,7 @@ const App = () => {
         data={data}
         onUpload={handleUpload}
         onFilter={setFilterRadius}
-        onSearchResults={handleSearchResults}
+        onSearchResults={(res) => handleSearchResults(res)}
         onCenter={handleCenterMap}
         onToggleVisibility={toggleMarkerVisibility}
         hiddenMarkers={hiddenMarkers}
@@ -195,7 +188,7 @@ const App = () => {
         <div className="import-button-overlay">
           <ImportCSV onUpload={handleUpload} />
         </div>
-        <Toaster position="top-center" reverseOrder={false} />
+        <Toaster position="top-center" />
       </main>
     </div>
   );

@@ -9,7 +9,7 @@ interface SidebarProps {
   data: DataPoint[];
   onUpload: (data: DataPoint[]) => void;
   onFilter: (radius: number) => void;
-  onSearchResults: (data: any) => void;
+  onSearchResults: (data: any[]) => void;
   onCenter: (lat: number, lon: number) => void;
   onToggleVisibility: (nom: string) => void;
   hiddenMarkers: string[];
@@ -89,7 +89,7 @@ const Sidebar = ({
         <FiltreSecteurs
           center={mapCenter}
           onSearchResults={(data) => wrappedOnSearchResults(Promise.resolve(data))}
-          radius={filterRadius || 5}
+          radius={filterRadius}
           onRadiusChange={handleRadiusChange}
         />
       </section>
@@ -121,7 +121,6 @@ const Sidebar = ({
               className="flex flex-col gap-1 p-2 rounded border border-gray-200 bg-white relative hover:shadow-md"
             >
               <div className="font-semibold">{item.Nom}</div>
-
               {item.Adresse && <div className="text-xs text-gray-500">{item.Adresse}</div>}
               {item.Secteur && <div className="text-xs italic text-gray-400">{item.Secteur}</div>}
 
@@ -139,21 +138,15 @@ const Sidebar = ({
                   className="p-1 rounded bg-gray-100 hover:bg-gray-200"
                   title={hiddenMarkers.includes(item.Nom) ? "Afficher" : "Masquer"}
                 >
-                  {hiddenMarkers.includes(item.Nom) ? (
-                    <FaEyeSlash className="text-blue-600" />
-                  ) : (
-                    <FaEye className="text-blue-600" />
-                  )}
+                  {hiddenMarkers.includes(item.Nom) ? <FaEyeSlash /> : <FaEye />}
                 </button>
 
-                {/* Correction ici : vérifier si le code NAF est valide avant de chercher similaires */}
+                {/* 🔵 Correction code NAF non valide */}
                 {item.CodeNAF && item.CodeNAF.length >= 5 ? (
                   <button
                     onClick={() =>
                       window.dispatchEvent(
-                        new CustomEvent("search-similar", {
-                          detail: { nom: item.Nom, naf: item.CodeNAF },
-                        })
+                        new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.CodeNAF } })
                       )
                     }
                     className="p-1 rounded bg-indigo-100 hover:bg-indigo-200 text-xs"
@@ -164,7 +157,7 @@ const Sidebar = ({
                 ) : (
                   <button
                     onClick={() => toast.error("❗ Aucun code NAF valide pour cette entreprise")}
-                    className="p-1 rounded bg-gray-100 text-gray-400 text-xs"
+                    className="p-1 rounded bg-gray-200 text-gray-400 text-xs"
                     title="Code NAF manquant"
                   >
                     🚫

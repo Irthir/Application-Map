@@ -13,7 +13,7 @@ interface Props {
 const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRadiusChange }) => {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(false);
-  const [selectedNafs, setSelectedNafs] = useState<string[]>([]);
+  const [selectedNaf, setSelectedNaf] = useState<string | null>(null);
   const [onlyActive, setOnlyActive] = useState(true);
   const [onlyCompanies, setOnlyCompanies] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -24,20 +24,22 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     n.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  const toggleNaf = (id: string) => {
-    setSelectedNafs((prev) =>
-      prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
-    );
+  const handleNafSelection = (id: string) => {
+    if (selectedNaf === id) {
+      setSelectedNaf(null); // décocher
+    } else {
+      setSelectedNaf(id); // forcer 1 seul sélectionné
+    }
   };
 
   const clearSelection = () => {
-    setSelectedNafs([]);
+    setSelectedNaf(null);
     toast.success("✅ Sélection vidée !");
   };
 
   const handleSearch = async () => {
-    if (selectedNafs.length === 0) {
-      toast.error("❗ Sélectionnez au moins un secteur d'activité !");
+    if (!selectedNaf) {
+      toast.error("❗ Sélectionnez un secteur d'activité !");
       return;
     }
 
@@ -46,21 +48,17 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
 
     try {
-      const allNafToSearch = new Set<string>();
+      const nafObj = nafCodes.find(n => n.id === selectedNaf);
+      if (!nafObj) throw new Error("Code NAF non trouvé dans la base enrichie.");
 
-      // ✅ Récupérer aussi les related codes
-      selectedNafs.forEach(id => {
-        const naf = nafCodes.find((n) => n.id === id);
-        if (naf) {
-          allNafToSearch.add(naf.id);
-          if (naf.related) {
-            naf.related.forEach(rel => allNafToSearch.add(rel));
-          }
-        }
-      });
+      const allNafs = new Set<string>([nafObj.id]);
+      if (nafObj.related) {
+        nafObj.related.forEach(rel => allNafs.add(rel));
+      }
 
       const allResults: any[] = [];
-      const promises = Array.from(allNafToSearch).map(async (naf) => {
+
+      for (const naf of allNafs) {
         const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompanies=${onlyCompanies}`;
         const res = await fetch(url);
 
@@ -68,11 +66,9 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
           const data = await res.json();
           allResults.push(...data);
         } else {
-          console.error(`Erreur pour le NAF ${naf}`);
+          console.error(`Erreur API pour le NAF ${naf}`);
         }
-      });
-
-      await Promise.all(promises); // ✅ attendre toutes les recherches en parallèle
+      }
 
       onSearchResults(allResults);
 
@@ -125,10 +121,11 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
               className="flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer text-sm"
             >
               <input
-                type="checkbox"
+                type="radio"
+                name="naf-selection"
                 value={n.id}
-                checked={selectedNafs.includes(n.id)}
-                onChange={() => toggleNaf(n.id)}
+                checked={selectedNaf === n.id}
+                onChange={() => handleNafSelection(n.id)}
               />
               {n.label}
             </label>

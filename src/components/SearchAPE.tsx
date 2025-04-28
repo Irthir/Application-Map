@@ -12,15 +12,16 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
   const [loading, setLoading] = useState(false);
 
   const handleSearch = async () => {
-    if (!input.trim() || loading) return; // Eviter recherche vide ou spam double clic
+    if (!input.trim() || loading) return;
 
     setSearchResults([]);
     setLoading(true);
 
     try {
-      if (/^\d{9}$/.test(input.replace(/\s+/g, ""))) {
-        // Recherche par SIREN
-        const companyData = await fetchCompanyBySIREN(input.replace(/\s+/g, ""));
+      const cleanedInput = input.replace(/\s+/g, "");
+      if (/^\d{9}$/.test(cleanedInput)) {
+        // 🔵 Recherche par SIREN
+        const companyData = await fetchCompanyBySIREN(cleanedInput);
         console.log("Données SIREN :", companyData);
 
         const uniteLegale = companyData?.uniteLegale;
@@ -37,36 +38,32 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         const geoData = await geocodeCompany(nom);
 
         if (geoData) {
-          onResults([
-            {
-              Nom: nom,
-              Latitude: geoData.lat,
-              Longitude: geoData.lon,
-              Type: "Recherche",
-              Secteur: naf, // 🔥 on passe aussi le secteur
-            },
-          ]);
+          onResults([{
+            Nom: nom,
+            Latitude: geoData.lat,
+            Longitude: geoData.lon,
+            Type: "Recherche",
+            Secteur: naf,
+          }]);
           setInput(nom);
           toast.success("✅ Entreprise trouvée !");
         } else {
           toast.error("❗ Localisation introuvable pour cette entreprise.");
         }
       } else {
-        // Recherche par nom ou adresse
-        const geoRes = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(input)}`
-        );
+        // 🔵 Recherche par texte
+        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(input)}`);
         const geoData = await geoRes.json();
 
         if (geoData.length > 0) {
-          setSearchResults(geoData.slice(0, 10)); // Limiter pour éviter surcharge
+          setSearchResults(geoData.slice(0, 10));
         } else {
-          toast.error("❗ Adresse ou nom d’entreprise non trouvé.");
+          toast.error("❗ Adresse ou nom introuvable.");
         }
       }
     } catch (error) {
       console.error("Erreur de recherche :", error);
-      toast.error("❗ Une erreur est survenue pendant la recherche.");
+      toast.error("❗ Erreur pendant la recherche.");
     } finally {
       setLoading(false);
     }
@@ -74,26 +71,20 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
 
   const handleSelectResult = (result: any) => {
     setSearchResults([]);
-    onResults([
-      {
-        Nom: result.display_name,
-        Latitude: parseFloat(result.lat),
-        Longitude: parseFloat(result.lon),
-        Type: "Recherche",
-        Secteur: "", // 🔥 Pas de secteur connu pour Nominatim
-      },
-    ]);
+    onResults([{
+      Nom: result.display_name,
+      Latitude: parseFloat(result.lat),
+      Longitude: parseFloat(result.lon),
+      Type: "Recherche",
+      Secteur: "",
+    }]);
     setInput(result.display_name);
   };
 
-  const handleClearResults = () => {
-    setSearchResults([]);
-  };
+  const handleClearResults = () => setSearchResults([]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
+    if (e.key === "Enter") handleSearch();
   };
 
   return (
