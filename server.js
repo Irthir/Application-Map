@@ -6,8 +6,8 @@ import fs from "fs";
 import { LambertToWGS84 } from "./utils/lambertToWGS84.js";
 
 dotenv.config();
-
 const app = express();
+
 const allowedOrigins = ["https://irthir.github.io", "http://localhost:5173"];
 
 app.use(cors({
@@ -41,7 +41,6 @@ const getToken = async () => {
     },
     body: "grant_type=client_credentials",
   });
-
   if (!response.ok) throw new Error(`Erreur token INSEE: ${response.statusText}`);
   const data = await response.json();
   token = data.access_token;
@@ -68,8 +67,7 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 app.get("/api/insee-activite", async (req, res) => {
   try {
     await ensureToken();
-
-    const { naf, lat, lng, radius, onlyActive = "false", onlyCompanies = "false" } = req.query;
+    const { naf, lat, lng, radius, onlyActive = "true", onlyCompanies = "true" } = req.query;
     if (!naf || !lat || !lng || !radius) {
       return res.status(400).json({ error: "Paramètres 'naf', 'lat', 'lng', 'radius' requis." });
     }
@@ -80,12 +78,12 @@ app.get("/api/insee-activite", async (req, res) => {
     const filterActive = onlyActive === "true";
     const filterCompany = onlyCompanies === "true";
 
-    const query = `periode(activitePrincipaleEtablissement:${naf})`; // on va aussi checker secondaire après
+    const query = `periode(activitePrincipaleEtablissement:${naf})`;
     const pageSize = 1000;
     let allEtablissements = [];
     let start = 0;
 
-    while (start < 10000) {
+    while (start < 3000) { // 🔥 limit 3000 max pour éviter surcharge
       const url = `${API_URL}?q=${encodeURIComponent(query)}&nombre=${pageSize}&debut=${start}`;
       console.log("🔍 URL appelée :", url);
 
@@ -98,6 +96,7 @@ app.get("/api/insee-activite", async (req, res) => {
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error("Erreur réponse INSEE:", errorText);
         throw new Error(`Erreur API INSEE: ${response.status} ${errorText}`);
       }
 
@@ -112,15 +111,14 @@ app.get("/api/insee-activite", async (req, res) => {
         })
       );
 
-      start += pageSize;
       if (etablissements.length < pageSize) break;
+      start += pageSize;
     }
 
-    console.log(`✨ Total établissements récupérés: ${allEtablissements.length}`);
+    console.log(`✨ Établissements récupérés : ${allEtablissements.length}`);
 
-    // 🔥 Nouvelle logique : si pas trouvé dans activité principale, chercher aussi dans secondaires
     const filtered = allEtablissements.map((e) => {
-      let latWGS, lonWGS, distance = null;
+      let latWGS, lonWGS;
 
       const lambertX = parseFloat(e.adresseEtablissement.coordonneeLambertAbscisseEtablissement);
       const lambertY = parseFloat(e.adresseEtablissement.coordonneeLambertOrdonneeEtablissement);
@@ -128,85 +126,34 @@ app.get("/api/insee-activite", async (req, res) => {
       if (!isNaN(lambertX) && !isNaN(lambertY)) {
         [latWGS, lonWGS] = LambertToWGS84(lambertX, lambertY);
       } else {
-        const codePostal = e.adresseEtablissement.codePostalEtablissement;
-        const coordFallback = codePostalData.find(entry => entry.Code_postal == codePostal);
-        if (coordFallback) {
-          latWGS = coordFallback.latitude;
-          lonWGS = coordFallback.longitude;
+        const fallback = codePostalData.find(cp => cp.Code_postal === e.adresseEtablissement.codePostalEtablissement);
+        if (fallback) {
+          latWGS = fallback.latitude;
+          lonWGS = fallback.longitude;
         }
       }
 
-      if (latWGS !== undefined && lonWGS !== undefined) {
-        distance = haversineDistance(latNum, lngNum, latWGS, lonWGS);
-        if (isNaN(distance) || distance > radiusNum) return null;
-      } else {
-        console.warn(`⚠️ Pas de coordonnées pour ${e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale}`);
-        return null;
-      }
-
-      // 🔎 Vérifie si l'élément match en secondaire aussi
-      const activitesSecondaires = e.periodesEtablissement?.[0]?.activitePrincipaleEtablissement
-        ? [e.periodesEtablissement[0].activitePrincipaleEtablissement]
-        : [];
-
-      if (e.periodesEtablissement?.[0]?.activitesSecondairesEtablissement) {
-        const secondaires = e.periodesEtablissement[0].activitesSecondairesEtablissement.map(a => a.activiteSecondaireEtablissement);
-        activitesSecondaires.push(...secondaires);
-      }
-
-      if (!activitesSecondaires.includes(naf)) {
-        return null;
-      }
+      if (!latWGS || !lonWGS) return null;
+      const distance = haversineDistance(latNum, lngNum, latWGS, lonWGS);
+      if (isNaN(distance) || distance > radiusNum) return null;
 
       return {
         Nom: e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale || "Entreprise",
-        CodePostal: e.adresseEtablissement.codePostalEtablissement,
-        Commune: e.adresseEtablissement.libelleCommuneEtablissement || "Commune inconnue",
-        CodeCommune: e.adresseEtablissement.codeCommuneEtablissement,
+        Latitude: latWGS,
+        Longitude: lonWGS,
+        Adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement}`.trim(),
+        Secteur: e.periodesEtablissement?.[0]?.activitePrincipaleEtablissement || "",
+        CodeNAF: e.periodesEtablissement?.[0]?.activitePrincipaleEtablissement || "",
         Type: "Recherche",
-        Distance: distance.toFixed(2),
-        adresse: `${e.adresseEtablissement.numeroVoieEtablissement || ""} ${e.adresseEtablissement.typeVoieEtablissement || ""} ${e.adresseEtablissement.libelleVoieEtablissement || ""}, ${e.adresseEtablissement.codePostalEtablissement} ${e.adresseEtablissement.libelleCommuneEtablissement || ""}`.trim(),
-        secteur: activitesSecondaires.join(", "), // toutes les activités listées
       };
     }).filter(Boolean);
 
-    console.log(`✅ Établissements après filtrage par distance et secteurs secondaires: ${filtered.length}`);
+    console.log(`✅ Établissements filtrés: ${filtered.length}`);
     res.json(filtered);
 
   } catch (error) {
-    console.error("💥 Erreur INSEE:", error);
-    res.status(500).json({ error: error.message || "Erreur interne" });
-  }
-});
-
-// Autre route inchangée
-app.get("/api/insee/:siren", async (req, res) => {
-  try {
-    await ensureToken();
-    const { siren } = req.params;
-
-    if (!siren || !/^\d{9}$/.test(siren)) {
-      return res.status(400).json({ error: "SIREN invalide" });
-    }
-
-    const url = `https://api.insee.fr/entreprises/sirene/V3.11/siren/${siren}`;
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Erreur API INSEE: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("💥 Erreur SIREN:", error);
-    res.status(500).json({ error: error.message || "Erreur serveur" });
+    console.error("💥 Erreur traitement serveur:", error);
+    res.status(500).json({ error: error.message || "Erreur interne serveur" });
   }
 });
 
