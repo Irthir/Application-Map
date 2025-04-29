@@ -14,8 +14,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [selectedNaf, setSelectedNaf] = useState<string | null>(null);
-  const [onlyActive, setOnlyActive] = useState(true);
-  const [onlyCompanies, setOnlyCompanies] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const baseUrl = "https://application-map.onrender.com";
@@ -25,11 +23,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
   );
 
   const handleNafSelection = (id: string) => {
-    if (selectedNaf === id) {
-      setSelectedNaf(null); // décocher
-    } else {
-      setSelectedNaf(id); // forcer 1 seul sélectionné
-    }
+    setSelectedNaf(prev => (prev === id ? null : id)); // toggle radio
   };
 
   const clearSelection = () => {
@@ -45,21 +39,18 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
 
     const [lng, lat] = center;
     setLoading(true);
-    toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
+    toast.loading(`🔎 Recherche secteur en cours...`, { id: "search-loading" });
 
     try {
-      const nafObj = nafCodes.find(n => n.id === selectedNaf);
-      if (!nafObj) throw new Error("Code NAF non trouvé dans la base enrichie.");
+      const nafObj = nafCodes.find((n) => n.id === selectedNaf);
+      if (!nafObj) throw new Error("Code NAF non trouvé dans la base.");
 
-      const allNafs = new Set<string>([nafObj.id]);
-      if (nafObj.related) {
-        nafObj.related.forEach(rel => allNafs.add(rel));
-      }
+      const nafCodesToSearch = [nafObj.id, ...(nafObj.related || [])];
 
       const allResults: any[] = [];
 
-      for (const naf of allNafs) {
-        const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=${onlyActive}&onlyCompanies=${onlyCompanies}`;
+      for (const naf of nafCodesToSearch) {
+        const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}`;
         const res = await fetch(url);
 
         if (res.ok) {
@@ -133,27 +124,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         </div>
       )}
 
-      {/* Filtres supplémentaires */}
-      <div className="flex flex-col gap-2 mt-2 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={onlyActive}
-            onChange={() => setOnlyActive(prev => !prev)}
-          />
-          Entreprises actives uniquement
-        </label>
-
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={onlyCompanies}
-            onChange={() => setOnlyCompanies(prev => !prev)}
-          />
-          Seulement sociétés (cat. juridique ≥ 2000)
-        </label>
-      </div>
-
       {/* Slider de rayon */}
       <input
         type="range"
@@ -171,7 +141,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
           disabled={loading}
           className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800 disabled:opacity-50"
         >
-          {loading ? "🔍 Recherche en cours..." : "🔎 Lancer la recherche"}
+          {loading ? "🔍 Recherche..." : "🔎 Lancer la recherche"}
         </button>
 
         <button
