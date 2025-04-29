@@ -45,12 +45,12 @@ const getToken = async () => {
   const data = await response.json();
   token = data.access_token;
   tokenExpiry = Date.now() + data.expires_in * 1000;
-  console.log("✅ Token INSEE mis à jour");
+  console.log("✅ Token INSEE récupéré");
 };
 
 const ensureToken = async () => {
   if (!token || Date.now() >= tokenExpiry) {
-    console.log("🔄 Récupération du token INSEE...");
+    console.log("🔄 Rafraîchissement token...");
     await getToken();
   }
 };
@@ -67,7 +67,8 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
 app.get("/api/insee-activite", async (req, res) => {
   try {
     await ensureToken();
-    const { naf, lat, lng, radius, onlyActive = "true", onlyCompanies = "true" } = req.query;
+
+    const { naf, lat, lng, radius, onlyActive = "false", onlyCompanies = "false" } = req.query;
     if (!naf || !lat || !lng || !radius) {
       return res.status(400).json({ error: "Paramètres 'naf', 'lat', 'lng', 'radius' requis." });
     }
@@ -83,9 +84,9 @@ app.get("/api/insee-activite", async (req, res) => {
     let allEtablissements = [];
     let start = 0;
 
-    while (start < 3000) { // 🔥 limit 3000 max pour éviter surcharge
+    while (start < 3000) { // 🔥 Limite à 3000 pour éviter surcharge
       const url = `${API_URL}?q=${encodeURIComponent(query)}&nombre=${pageSize}&debut=${start}`;
-      console.log("🔍 URL appelée :", url);
+      console.log("🔍 Appel API INSEE :", url);
 
       const response = await fetch(url, {
         headers: {
@@ -96,15 +97,15 @@ app.get("/api/insee-activite", async (req, res) => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("Erreur réponse INSEE:", errorText);
-        throw new Error(`Erreur API INSEE: ${response.status} ${errorText}`);
+        console.error("Erreur INSEE:", errorText);
+        throw new Error(`Erreur API INSEE (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
       const etablissements = data.etablissements || [];
 
       allEtablissements = allEtablissements.concat(
-        etablissements.filter((e) => {
+        etablissements.filter(e => {
           if (filterActive && e.etatAdministratifEtablissement !== "A") return false;
           if (filterCompany && parseInt(e.uniteLegale?.categorieJuridiqueUniteLegale || "0") < 2000) return false;
           return true;
@@ -115,9 +116,9 @@ app.get("/api/insee-activite", async (req, res) => {
       start += pageSize;
     }
 
-    console.log(`✨ Établissements récupérés : ${allEtablissements.length}`);
+    console.log(`✨ Total établissements chargés: ${allEtablissements.length}`);
 
-    const filtered = allEtablissements.map((e) => {
+    const results = allEtablissements.map((e) => {
       let latWGS, lonWGS;
 
       const lambertX = parseFloat(e.adresseEtablissement.coordonneeLambertAbscisseEtablissement);
@@ -130,10 +131,12 @@ app.get("/api/insee-activite", async (req, res) => {
         if (fallback) {
           latWGS = fallback.latitude;
           lonWGS = fallback.longitude;
+        } else {
+          console.warn("⚠️ Coordonnées manquantes pour:", e.uniteLegale?.denominationUniteLegale || e.uniteLegale?.nomUniteLegale);
+          return null;
         }
       }
 
-      if (!latWGS || !lonWGS) return null;
       const distance = haversineDistance(latNum, lngNum, latWGS, lonWGS);
       if (isNaN(distance) || distance > radiusNum) return null;
 
@@ -148,14 +151,45 @@ app.get("/api/insee-activite", async (req, res) => {
       };
     }).filter(Boolean);
 
-    console.log(`✅ Établissements filtrés: ${filtered.length}`);
-    res.json(filtered);
+    console.log(`✅ Résultats filtrés : ${results.length}`);
+    res.json(results);
 
   } catch (error) {
-    console.error("💥 Erreur traitement serveur:", error);
+    console.error("💥 Erreur serveur:", error);
     res.status(500).json({ error: error.message || "Erreur interne serveur" });
   }
 });
 
+// 🔎 Récupération entreprise par SIREN
+app.get("/api/insee/:siren", async (req, res) => {
+  try {
+    await ensureToken();
+    const { siren } = req.params;
+
+    if (!siren || !/^\d{9}$/.test(siren)) {
+      return res.status(400).json({ error: "SIREN invalide" });
+    }
+
+    const url = `https://api.insee.fr/entreprises/sirene/V3.11/siren/${siren}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erreur API INSEE (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error("💥 Erreur SIREN:", error);
+    res.status(500).json({ error: error.message || "Erreur serveur" });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Serveur en écoute sur http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Serveur API en ligne sur http://localhost:${PORT}`));
