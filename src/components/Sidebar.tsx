@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SearchAPE from "./SearchAPE";
 import FiltreSecteurs from "./FiltreSecteurs";
 import { FaEye, FaEyeSlash, FaMapMarkerAlt, FaTimes, FaFileCsv, FaTrashAlt } from "react-icons/fa";
@@ -65,6 +65,44 @@ const Sidebar = ({
     }
   };
 
+  // 🔄 Écouteur "Rechercher similaires" (version BigQuery)
+  useEffect(() => {
+    const handleSearchSimilar = async (e: Event) => {
+      const { nom, naf } = (e as CustomEvent<{ nom: string; naf: string }>).detail;
+      const ref = data.find((d) => d.Nom === nom);
+      if (!ref || !naf || !ref.Latitude || !ref.Longitude) {
+        toast.error("❗ Impossible de lancer la recherche similaire.");
+        return;
+      }
+
+      setGlobalLoading(true);
+      try {
+        const queryURL = `/api/bigquery-activite?naf=${encodeURIComponent(naf)}&lat=${ref.Latitude}&lng=${ref.Longitude}&radius=${filterRadius}`;
+        const res = await fetch(queryURL);
+        const results = await res.json();
+
+        // 🔁 Ancienne version avec l'API INSEE (désactivée)
+        // const queryURL = `/api/insee-activite?naf=${naf}&lat=${ref.Latitude}&lng=${ref.Longitude}&radius=${filterRadius}`;
+        // const res = await fetch(queryURL);
+
+        if (res.ok && Array.isArray(results)) {
+          onSearchResults(results);
+          toast.success(`✅ ${results.length} entreprise(s) similaire(s) trouvée(s) !`);
+        } else {
+          toast.error("❗ Aucune entreprise trouvée ou erreur API.");
+        }
+      } catch (err) {
+        console.error("Erreur recherche similaire :", err);
+        toast.error("❗ Échec de la recherche similaire.");
+      } finally {
+        setGlobalLoading(false);
+      }
+    };
+
+    window.addEventListener("search-similar", handleSearchSimilar);
+    return () => window.removeEventListener("search-similar", handleSearchSimilar);
+  }, [data, filterRadius, onSearchResults]);
+
   const clearAllData = () => {
     if (confirm("Voulez-vous vraiment tout supprimer ?")) {
       onUpload([]);
@@ -105,7 +143,6 @@ const Sidebar = ({
           >
             Supprimer "Recherche"
           </button>
-
           <button
             onClick={clearAllData}
             className="flex-1 bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 text-sm"
@@ -121,61 +158,50 @@ const Sidebar = ({
               className="flex flex-col gap-1 p-2 rounded border border-gray-200 bg-white relative hover:shadow-md"
             >
               <div className="font-semibold">{item.Nom}</div>
-              {item.Adresse && <div className="text-xs text-gray-500">{item.Adresse}</div>}
-              {item.Secteur && <div className="text-xs italic text-gray-400">{item.Secteur}</div>}
+              {item.Adresse && (
+                <div className="text-xs text-gray-500">
+                  {item.Adresse}
+                  {item.Distance && (
+                    <span className="ml-2 text-blue-500 font-semibold">({item.Distance} km)</span>
+                  )}
+                </div>
+              )}
+
+              {item.Secteur && (
+                <div className="text-xs italic text-gray-400">
+                  Code NAF : {item.Secteur}
+                </div>
+              )}
 
               <div className="flex gap-2 mt-1">
-                <button
-                  onClick={() => onCenter(item.Latitude, item.Longitude)}
-                  className="p-1 rounded bg-blue-100 hover:bg-blue-200"
-                  title="Centrer sur la carte"
-                >
+                <button onClick={() => onCenter(item.Latitude, item.Longitude)} className="p-1 rounded bg-blue-100 hover:bg-blue-200" title="Centrer sur la carte">
                   <FaMapMarkerAlt className="text-blue-600" />
                 </button>
 
-                <button
-                  onClick={() => onToggleVisibility(item.Nom)}
-                  className="p-1 rounded bg-gray-100 hover:bg-gray-200"
-                  title={hiddenMarkers.includes(item.Nom) ? "Afficher" : "Masquer"}
-                >
+                <button onClick={() => onToggleVisibility(item.Nom)} className="p-1 rounded bg-gray-100 hover:bg-gray-200" title={hiddenMarkers.includes(item.Nom) ? "Afficher" : "Masquer"}>
                   {hiddenMarkers.includes(item.Nom) ? <FaEyeSlash /> : <FaEye />}
                 </button>
 
-                {/* 🔵 Correction code NAF non valide */}
                 {item.CodeNAF && item.CodeNAF.length >= 5 ? (
                   <button
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.CodeNAF } })
-                      )
-                    }
+                    onClick={() => window.dispatchEvent(new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.CodeNAF } }))}
                     className="p-1 rounded bg-indigo-100 hover:bg-indigo-200 text-xs"
                     title="Rechercher similaires"
                   >
                     🔍 Similaires
                   </button>
                 ) : (
-                  <button
-                    onClick={() => toast.error("❗ Aucun code NAF valide pour cette entreprise")}
-                    className="p-1 rounded bg-gray-200 text-gray-400 text-xs"
-                    title="Code NAF manquant"
-                  >
+                  <button className="p-1 rounded bg-gray-200 text-gray-400 text-xs" title="Code NAF manquant" onClick={() => toast.error("❗ Aucun code NAF valide pour cette entreprise")}>
                     🚫
                   </button>
                 )}
               </div>
 
               <div className="flex gap-2 mt-1 text-xs">
-                <button
-                  onClick={() => onSetType(item.Nom, "Client")}
-                  className="flex-1 bg-green-100 text-green-700 py-1 rounded hover:bg-green-200"
-                >
+                <button onClick={() => onSetType(item.Nom, "Client")} className="flex-1 bg-green-100 text-green-700 py-1 rounded hover:bg-green-200">
                   Client
                 </button>
-                <button
-                  onClick={() => onSetType(item.Nom, "Prospect")}
-                  className="flex-1 bg-yellow-100 text-yellow-700 py-1 rounded hover:bg-yellow-200"
-                >
+                <button onClick={() => onSetType(item.Nom, "Prospect")} className="flex-1 bg-yellow-100 text-yellow-700 py-1 rounded hover:bg-yellow-200">
                   Prospect
                 </button>
               </div>

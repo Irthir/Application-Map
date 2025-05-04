@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import nafCodes from "../data/naf-codes-enriched.json"; // ✅ version enrichie
+import nafCodes from "../data/naf-codes-enriched.json";
 import toast from "react-hot-toast";
 
 interface NafCode {
@@ -27,8 +27,8 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
   const baseUrl = "https://application-map.onrender.com";
 
   useEffect(() => {
-    // Optionnel : on peut filtrer uniquement les niveaux détaillés (ex: 01.13Z et pas 01)
-    const detailedCodes = nafCodes.filter((code) => code.id.includes("."));
+    // Ne garder que les codes NAF détaillés (avec un point)
+    const detailedCodes = nafCodes.filter(code => code.id.includes("."));
     setNafList(detailedCodes);
   }, []);
 
@@ -40,13 +40,16 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
 
     const [lng, lat] = center;
     setLoading(true);
-    toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
+    toast.loading("🔍 Recherche BigQuery en cours...", { id: "search-loading" });
 
     try {
-      const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=true&onlyCompanies=true`;
+      const url = `${baseUrl}/api/bigquery-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}`;
       const res = await fetch(url);
 
-      if (!res.ok) throw new Error("Erreur serveur INSEE");
+      // Ancienne version INSEE — désactivée
+      // const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=true&onlyCompanies=true`;
+
+      if (!res.ok) throw new Error("Erreur serveur");
 
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -56,8 +59,8 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
         toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
       }
     } catch (error) {
-      console.error("Erreur INSEE :", error);
-      toast.error("Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
+      console.error("Erreur recherche BigQuery :", error);
+      toast.error("❗ Erreur lors de la récupération des données.", { id: "search-loading" });
     } finally {
       setLoading(false);
     }
@@ -65,7 +68,7 @@ const FiltreINSEEHierarchique: React.FC<Props> = ({
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">🏭 Filtrer par industrie (NAF)</h3>
+      <h3 className="font-semibold mb-2">🏭 Filtrer par industrie (code NAF)</h3>
 
       <select
         value={selectedNaf}

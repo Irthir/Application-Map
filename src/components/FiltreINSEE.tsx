@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import nafCodes from "../data/naf-codes-enriched.json"; // ✅ version enrichie
+import nafCodes from "../data/naf-codes-enriched.json";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -22,24 +22,34 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
 
     const [lng, lat] = center;
     setLoading(true);
-    toast.loading("🔎 Recherche en cours...", { id: "search-loading" });
+    toast.loading("🔍 Recherche BigQuery en cours...", { id: "search-loading" });
 
     try {
-      const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=true&onlyCompanies=true`;
-      const res = await fetch(url);
+      const url = `${baseUrl}/api/bigquery-activite?naf=${encodeURIComponent(
+        selectedNaf
+      )}&lat=${lat}&lng=${lng}&radius=${radius}`;
 
-      if (!res.ok) throw new Error("Erreur serveur INSEE");
+      // 💤 Ancienne API INSEE
+      // const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(selectedNaf)}&lat=${lat}&lng=${lng}&radius=${radius}&onlyActive=true&onlyCompanies=true`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erreur serveur");
 
       const data = await res.json();
+
       if (Array.isArray(data) && data.length > 0) {
         onSearchResults(data);
-        toast.success(`✅ ${data.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
+        toast.success(`✅ ${data.length} entreprise(s) trouvée(s) !`, {
+          id: "search-loading",
+        });
       } else {
         toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
       }
     } catch (error) {
-      console.error("Erreur INSEE :", error);
-      toast.error("Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
+      console.error("Erreur BigQuery :", error);
+      toast.error("❗ Erreur lors de la récupération des données.", {
+        id: "search-loading",
+      });
     } finally {
       setLoading(false);
     }
@@ -47,7 +57,7 @@ const FiltreINSEE: React.FC<Props> = ({ center, onSearchResults }) => {
 
   return (
     <div className="mb-4">
-      <h3 className="font-semibold mb-2">🔎 Filtrer par activité INSEE</h3>
+      <h3 className="font-semibold mb-2">🔎 Filtrer par activité (code NAF)</h3>
 
       <select
         value={selectedNaf}

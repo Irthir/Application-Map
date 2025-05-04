@@ -6,4 +6,5 @@ export interface DataPoint {
   Adresse?: string;
   Secteur?: string;
   CodeNAF?: string;
+  Distance?: string;
 }

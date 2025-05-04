@@ -94,3 +94,6 @@ npm-debug.log*
 
 # Vite test folders
 /vitest/
+
+
+gcp-key.json

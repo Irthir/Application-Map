@@ -1,6 +1,6 @@
 import { useState } from "react";
-import toast from 'react-hot-toast';
-import { fetchCompanyBySIREN, geocodeCompany } from "../services/apiUtils";
+import toast from "react-hot-toast";
+//import { geocodeCompany } from "../services/apiUtils";
 
 interface SearchAPEProps {
   onResults: (data: any[]) => void;
@@ -20,10 +20,27 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
     try {
       const cleanedInput = input.replace(/\s+/g, "");
       if (/^\d{9}$/.test(cleanedInput)) {
-        // 🔵 Recherche par SIREN
-        const companyData = await fetchCompanyBySIREN(cleanedInput);
-        console.log("Données SIREN :", companyData);
+        // ✅ Recherche via BigQuery
+        const res = await fetch(`/api/bigquery/${cleanedInput}`);
+        if (!res.ok) {
+          toast.error("❗ Entreprise introuvable (BigQuery)");
+          return;
+        }
 
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+          toast.error("❗ Aucune entreprise trouvée.");
+          return;
+        }
+
+        const entreprise = data[0];
+        onResults([entreprise]);
+        setInput(entreprise.Nom);
+        toast.success("✅ Entreprise trouvée !");
+
+        // 🔁 Ancienne version INSEE désactivée
+        /*
+        const companyData = await fetchCompanyBySIREN(cleanedInput);
         const uniteLegale = companyData?.uniteLegale;
         const activePeriod = uniteLegale?.periodesUniteLegale?.find((p: any) => p.dateFin === null);
 
@@ -36,22 +53,16 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
         const naf = activePeriod.activitePrincipaleUniteLegale || "";
 
         const geoData = await geocodeCompany(nom);
-
         if (geoData) {
-          onResults([{
-            Nom: nom,
-            Latitude: geoData.lat,
-            Longitude: geoData.lon,
-            Type: "Recherche",
-            Secteur: naf,
-          }]);
+          onResults([{ Nom: nom, Latitude: geoData.lat, Longitude: geoData.lon, Type: "Recherche", Secteur: naf }]);
           setInput(nom);
           toast.success("✅ Entreprise trouvée !");
         } else {
-          toast.error("❗ Localisation introuvable pour cette entreprise.");
+          toast.error("❗ Localisation introuvable.");
         }
+        */
       } else {
-        // 🔵 Recherche par texte
+        // 🔍 Recherche géographique (libre)
         const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(input)}`);
         const geoData = await geoRes.json();
 
@@ -71,20 +82,16 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
 
   const handleSelectResult = (result: any) => {
     setSearchResults([]);
-    onResults([{
-      Nom: result.display_name,
-      Latitude: parseFloat(result.lat),
-      Longitude: parseFloat(result.lon),
-      Type: "Recherche",
-      Secteur: "",
-    }]);
+    onResults([
+      {
+        Nom: result.display_name,
+        Latitude: parseFloat(result.lat),
+        Longitude: parseFloat(result.lon),
+        Type: "Recherche",
+        Secteur: "",
+      },
+    ]);
     setInput(result.display_name);
-  };
-
-  const handleClearResults = () => setSearchResults([]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleSearch();
   };
 
   return (
@@ -95,7 +102,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
           placeholder="Nom, adresse ou SIREN"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
           disabled={loading}
         />
@@ -119,7 +126,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
           <div className="flex justify-between items-center p-2 border-b">
             <span className="text-sm font-semibold">Résultats</span>
             <button
-              onClick={handleClearResults}
+              onClick={() => setSearchResults([])}
               className="text-gray-500 hover:text-red-500 text-lg font-bold leading-none"
             >
               &times;

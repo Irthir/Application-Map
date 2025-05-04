@@ -1,6 +1,6 @@
 import { InseeCompanyData, Coordinates, CompanyCoordinates } from "../types/apiTypes";
 
-// 🏢 Récupérer les données INSEE via SIREN
+// 🏢 Récupération via INSEE API
 export const fetchCompanyBySIREN = async (siren: string): Promise<InseeCompanyData> => {
   const formattedSiren = siren.replace(/\s+/g, "");
 
@@ -13,6 +13,62 @@ export const fetchCompanyBySIREN = async (siren: string): Promise<InseeCompanyDa
     const errorText = await response.text();
     console.error("Erreur INSEE :", errorText);
     throw new Error("Erreur lors de la récupération des données INSEE");
+  }
+
+  return response.json();
+};
+
+// 🔍 Récupération via BigQuery : SIREN
+export interface BQCompanyData {
+  Nom: string;
+  Latitude: number;
+  Longitude: number;
+  Adresse: string;
+  CodeNAF: string;
+  Type: "Recherche";
+  Distance?: string;
+}
+
+export const fetchCompanyBySIREN_BQ = async (siren: string): Promise<BQCompanyData[]> => {
+  const formattedSiren = siren.replace(/\s+/g, "");
+
+  const response = await fetch(`/api/bigquery/${formattedSiren}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Erreur BigQuery :", errorText);
+    throw new Error("Erreur lors de la récupération via BigQuery");
+  }
+
+  return response.json();
+};
+
+// 🔍 Récupération via BigQuery : activité par NAF + coordonnées
+export const fetchCompaniesByNAF_BQ = async (
+  naf: string,
+  lat: number,
+  lng: number,
+  radius: number
+): Promise<BQCompanyData[]> => {
+  const params = new URLSearchParams({
+    naf,
+    lat: lat.toString(),
+    lng: lng.toString(),
+    radius: radius.toString(),
+  });
+
+  const response = await fetch(`/api/bigquery-activite?${params.toString()}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Erreur BigQuery Activité :", errorText);
+    throw new Error("Erreur lors de la récupération des entreprises par activité");
   }
 
   return response.json();
@@ -45,13 +101,12 @@ export const geocodeAddress = async (address: string): Promise<Coordinates> => {
   return { latitude, longitude };
 };
 
-// 🏭 Géocoder une entreprise par son nom avec Nominatim
+// 🏭 Géocoder une entreprise par nom (Nominatim)
 export const geocodeCompany = async (companyName: string): Promise<CompanyCoordinates | null> => {
   const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(companyName)}`;
 
   try {
     const response = await fetch(url);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Erreur Nominatim:", errorText);
@@ -59,7 +114,6 @@ export const geocodeCompany = async (companyName: string): Promise<CompanyCoordi
     }
 
     const data = await response.json();
-
     if (!Array.isArray(data) || data.length === 0) {
       console.warn(`Entreprise non trouvée: ${companyName}`);
       return null;

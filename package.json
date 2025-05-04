@@ -13,6 +13,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@google-cloud/bigquery": "^8.0.0",
     "@supabase/supabase-js": "^2.49.3",
     "@turf/turf": "^7.2.0",
     "cors": "^2.8.5",

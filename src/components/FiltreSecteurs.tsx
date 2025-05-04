@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import nafCodes from "../data/naf-codes-enriched.json"; // ✅ version enrichie
+import nafCodes from "../data/naf-codes-enriched.json";
 import { FaChevronDown, FaChevronUp, FaSearch, FaBroom } from "react-icons/fa";
 import toast from "react-hot-toast";
+import { fetchCompaniesByNAF_BQ } from "../services/apiUtils";
+import { BQCompanyData } from "../services/apiUtils";
 
 interface Props {
   center: [number, number];
-  onSearchResults: (data: any[]) => void;
+  onSearchResults: (data: BQCompanyData[]) => void;
   radius: number;
   onRadiusChange: (radius: number) => void;
 }
@@ -16,14 +18,12 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
   const [selectedNaf, setSelectedNaf] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const baseUrl = "https://application-map.onrender.com";
-
   const filteredNaf = nafCodes.filter((n) =>
     n.label.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleNafSelection = (id: string) => {
-    setSelectedNaf(prev => (prev === id ? null : id)); // toggle radio
+    setSelectedNaf(prev => (prev === id ? null : id));
   };
 
   const clearSelection = () => {
@@ -46,19 +46,20 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
       if (!nafObj) throw new Error("Code NAF non trouvé dans la base.");
 
       const nafCodesToSearch = [nafObj.id, ...(nafObj.related || [])];
-
-      const allResults: any[] = [];
+      const allResults: BQCompanyData[] = [];
 
       for (const naf of nafCodesToSearch) {
-        const url = `${baseUrl}/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${radius}`;
-        const res = await fetch(url);
-
-        if (res.ok) {
-          const data = await res.json();
-          allResults.push(...data);
-        } else {
-          console.error(`Erreur API pour le NAF ${naf}`);
+        try {
+          const results = await fetchCompaniesByNAF_BQ(naf, lat, lng, radius);
+          allResults.push(...results);
+        } catch (err) {
+          console.error(`Erreur BigQuery pour le code NAF ${naf}`, err);
         }
+
+        // 🔁 Ancienne version API INSEE (désactivée temporairement)
+        // const res = await fetch(`${baseUrl}/api/insee-activite?naf=${naf}&lat=${lat}&lng=${lng}&radius=${radius}`);
+        // const data = await res.json();
+        // allResults.push(...data);
       }
 
       onSearchResults(allResults);
@@ -69,8 +70,8 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
       }
     } catch (error) {
-      console.error("Erreur INSEE:", error);
-      toast.error("Erreur lors de la récupération des données INSEE.", { id: "search-loading" });
+      console.error("Erreur secteur :", error);
+      toast.error("Erreur lors de la récupération des données.", { id: "search-loading" });
     } finally {
       setLoading(false);
     }

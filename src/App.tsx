@@ -26,7 +26,7 @@ const App = () => {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [unsavedChanges]);
 
-  // 🔎 Recherche similaire par évènement
+  // 🔎 Recherche similaire par événement personnalisé
   useEffect(() => {
     const handleSearchSimilar = async (e: Event) => {
       const { nom, naf } = (e as CustomEvent<{ nom: string; naf: string }>).detail;
@@ -38,11 +38,12 @@ const App = () => {
       }
 
       try {
-        const res = await fetch(
-          `https://application-map.onrender.com/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius}`
-        );
-        if (!res.ok) throw new Error("Erreur serveur");
+        const url = `/api/bigquery-activite?naf=${encodeURIComponent(naf)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius}`;
+        // Ancienne version :
+        // const url = `/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius}`;
 
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Erreur serveur");
         const entreprises = await res.json();
         handleSearchResults(entreprises);
       } catch (err) {
@@ -65,9 +66,9 @@ const App = () => {
         Nom: r.Nom || "Entreprise",
         Latitude: r.Latitude,
         Longitude: r.Longitude,
-        Adresse: r.adresse || "",
-        Secteur: r.secteur || "",
-        CodeNAF: r.codeNAF || "",
+        Adresse: r.Adresse || r.adresse || "",
+        Secteur: r.Secteur || r.secteur || "",
+        CodeNAF: r.CodeNAF || r.codeNAF || "",
         Type: r.Type || "Recherche",
       }));
 
@@ -89,17 +90,19 @@ const App = () => {
     setMapCenter([avgLon, avgLat]);
   };
 
-  // 🗺️ Actions sur la carte
+  // 🗺️ Carte : centrage et filtres
   const handleCenterMap = (lat: number, lon: number) => setMapCenter([lon, lat]);
   const toggleMarkerVisibility = (nom: string) => {
-    setHiddenMarkers(prev => prev.includes(nom) ? prev.filter(n => n !== nom) : [...prev, nom]);
+    setHiddenMarkers(prev =>
+      prev.includes(nom) ? prev.filter(n => n !== nom) : [...prev, nom]
+    );
   };
 
   const removeRechercheMarkers = () => {
     setData(prev => prev.filter(d => d.Type !== "Recherche"));
   };
 
-  // 🔵 Actions utilisateurs
+  // 🎯 Marquage client/prospect
   const handleSetType = (nom: string, type: "Client" | "Prospect") => {
     setData(prev => prev.map(d => d.Nom === nom ? { ...d, Type: type } : d));
     setUnsavedChanges(true);
@@ -110,6 +113,7 @@ const App = () => {
     setUnsavedChanges(true);
   };
 
+  // 📥 Import CSV
   const handleUpload = (uploadedData: any[]) => {
     const formatted = uploadedData.map((item) => ({
       Nom: item.Nom,
@@ -125,6 +129,7 @@ const App = () => {
     toast.success(`✅ ${formatted.length} entrée(s) importée(s)`);
   };
 
+  // 📤 Export CSV
   const handleExport = () => {
     const markedData = data.filter(d => d.Type === "Client" || d.Type === "Prospect");
     if (!markedData.length) {
@@ -148,8 +153,15 @@ const App = () => {
     toast.success("✅ Export CSV effectué !");
   };
 
+  // 📄 Modèle CSV
   const handleDownloadTemplate = () => {
-    const csvContent = "Nom,Latitude,Longitude,Type,Adresse,Secteur,CodeNAF\n";
+    const csvContent = [
+      ["Nom", "Latitude", "Longitude", "Type", "Adresse", "Secteur", "CodeNAF"],
+      ["Boulangerie Dupont", "48.8566", "2.3522", "Client", "123 Rue de Paris, 75001 Paris", "Boulangerie et boulangerie-pâtisserie", "1071C"]
+    ]
+      .map(row => row.join(","))
+      .join("\n");
+  
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -158,6 +170,7 @@ const App = () => {
     link.click();
     toast.success("✅ Modèle CSV téléchargé !");
   };
+  
 
   return (
     <div className="app-container">
