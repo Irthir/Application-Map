@@ -55,11 +55,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         } catch (err) {
           console.error(`Erreur BigQuery pour le code NAF ${naf}`, err);
         }
-
-        // 🔁 Ancienne version API INSEE (désactivée temporairement)
-        // const res = await fetch(`${baseUrl}/api/insee-activite?naf=${naf}&lat=${lat}&lng=${lng}&radius=${radius}`);
-        // const data = await res.json();
-        // allResults.push(...data);
       }
 
       onSearchResults(allResults);
@@ -81,7 +76,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     <div className="mb-4">
       <h3 className="text-lg font-bold mb-2">🎯 Filtrer par secteur d'activité</h3>
 
-      {/* Barre de recherche */}
       <div className="relative mb-2">
         <FaSearch className="absolute left-3 top-3 text-gray-400" />
         <input
@@ -93,18 +87,13 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         />
       </div>
 
-      {/* Paramètres */}
       <div className="flex justify-between items-center mb-2">
         <label className="font-medium">Rayon : {radius} km</label>
-        <button
-          onClick={() => setExpanded(prev => !prev)}
-          className="text-blue-600"
-        >
+        <button onClick={() => setExpanded(prev => !prev)} className="text-blue-600">
           {expanded ? <FaChevronUp /> : <FaChevronDown />}
         </button>
       </div>
 
-      {/* Liste des secteurs */}
       {expanded && (
         <div className="max-h-64 overflow-y-auto border rounded p-2 grid grid-cols-3 gap-2">
           {filteredNaf.map((n) => (
@@ -125,7 +114,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         </div>
       )}
 
-      {/* Slider de rayon */}
       <input
         type="range"
         min="1"
@@ -135,7 +123,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
         className="w-full mt-4"
       />
 
-      {/* Boutons actions */}
       <div className="flex flex-col gap-2 mt-4">
         <button
           onClick={handleSearch}

@@ -1,10 +1,13 @@
 import { InseeCompanyData, Coordinates, CompanyCoordinates } from "../types/apiTypes";
 
+// 🌐 Base URL API (local ou production)
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://application-map.onrender.com";
+
 // 🏢 Récupération via INSEE API
 export const fetchCompanyBySIREN = async (siren: string): Promise<InseeCompanyData> => {
   const formattedSiren = siren.replace(/\s+/g, "");
 
-  const response = await fetch(`https://application-map.onrender.com/api/insee/${formattedSiren}`, {
+  const response = await fetch(`${API_BASE}/api/insee/${formattedSiren}`, {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -32,7 +35,7 @@ export interface BQCompanyData {
 export const fetchCompanyBySIREN_BQ = async (siren: string): Promise<BQCompanyData[]> => {
   const formattedSiren = siren.replace(/\s+/g, "");
 
-  const response = await fetch(`/api/bigquery/${formattedSiren}`, {
+  const response = await fetch(`${API_BASE}/api/bigquery/${formattedSiren}`, {
     method: "GET",
     headers: { Accept: "application/json" },
   });
@@ -60,7 +63,7 @@ export const fetchCompaniesByNAF_BQ = async (
     radius: radius.toString(),
   });
 
-  const response = await fetch(`/api/bigquery-activite?${params.toString()}`, {
+  const response = await fetch(`${API_BASE}/api/bigquery-activite?${params.toString()}`, {
     method: "GET",
     headers: { Accept: "application/json" },
   });

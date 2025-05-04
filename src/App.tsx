@@ -13,6 +13,7 @@ const App = () => {
   const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://application-map.onrender.com";
 
   // 💾 Alerte fermeture si changements non sauvegardés
   useEffect(() => {
@@ -38,7 +39,7 @@ const App = () => {
       }
 
       try {
-        const url = `/api/bigquery-activite?naf=${encodeURIComponent(naf)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius}`;
+        const url = `${API_BASE}/api/bigquery-activite?naf=${encodeURIComponent(naf)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius}`;
         // Ancienne version :
         // const url = `/api/insee-activite?naf=${encodeURIComponent(naf)}&lat=${selected.Latitude}&lng=${selected.Longitude}&radius=${filterRadius}`;
 
