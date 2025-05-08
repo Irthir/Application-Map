@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
@@ -10,6 +9,7 @@ import { BigQuery } from "@google-cloud/bigquery";
 dotenv.config();
 const app = express();
 
+// Autorisations CORS
 const allowedOrigins = ["https://irthir.github.io", "http://localhost:5173"];
 app.use(cors({
   origin: (origin, callback) => {
@@ -22,43 +22,16 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Lecture code postal fallback
 const codePostalData = JSON.parse(fs.readFileSync("./src/data/code-postaux.json", "utf-8"));
 
+// Connexion BigQuery
 const bigquery = new BigQuery({
   credentials: JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS || '{}'),
   projectId: "application-map-458717"
 });
 
-const TOKEN_URL = "https://api.insee.fr/token";
-const API_URL = "https://api.insee.fr/entreprises/sirene/V3.11/siret";
-const INSEE_KEY = process.env.INSEE_API_KEY;
-const INSEE_SECRET = process.env.INSEE_API_SECRET;
-let token = "";
-let tokenExpiry = 0;
-
-const getToken = async () => {
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${INSEE_KEY}:${INSEE_SECRET}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-  if (!response.ok) throw new Error(`Erreur token INSEE: ${response.statusText}`);
-  const data = await response.json();
-  token = data.access_token;
-  tokenExpiry = Date.now() + data.expires_in * 1000;
-  console.log("✅ Token INSEE récupéré");
-};
-
-const ensureToken = async () => {
-  if (!token || Date.now() >= tokenExpiry) {
-    console.log("🔄 Rafraîchissement token...");
-    await getToken();
-  }
-};
-
+// Distance Haversine
 const haversineDistance = (lat1, lon1, lat2, lon2) => {
   const toRad = (x) => (x * Math.PI) / 180;
   const R = 6371;
@@ -68,6 +41,7 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+// 🔍 Recherche par activité (depuis ton dataset local)
 app.get("/api/bigquery-activite", async (req, res) => {
   const { naf, lat, lng, radius } = req.query;
   if (!naf || !lat || !lng || !radius) {
@@ -81,14 +55,14 @@ app.get("/api/bigquery-activite", async (req, res) => {
   try {
     const query = `
       SELECT
-        denominationunitelegale AS Nom,
-        activiteprincipaleetablissement AS CodeNAF,
-        coordonneelambertabscisseetablissement AS x,
-        coordonneelambertordonneeetablissement AS y,
-        codepostaletablissement,
-        libellecommuneetablissement
+        denominationUsuelleEtablissement AS Nom,
+        activitePrincipaleEtablissement AS CodeNAF,
+        coordonneeLambertAbscisseEtablissement AS x,
+        coordonneeLambertOrdonneeEtablissement AS y,
+        codePostalEtablissement,
+        libelleCommuneEtablissement
       FROM \`application-map-458717.sirene_data.etablissements\`
-      WHERE activiteprincipaleetablissement = @naf
+      WHERE activitePrincipaleEtablissement = @naf
       LIMIT 3000
     `;
 
@@ -113,7 +87,7 @@ app.get("/api/bigquery-activite", async (req, res) => {
         Nom: row.Nom || "Entreprise",
         Latitude: latitude,
         Longitude: longitude,
-        Adresse: `${row.codepostaletablissement || ""} ${row.libellecommuneetablissement || ""}`.trim(),
+        Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
         CodeNAF: row.CodeNAF,
         Type: "Recherche",
         Distance: distance.toFixed(2),
@@ -127,6 +101,7 @@ app.get("/api/bigquery-activite", async (req, res) => {
   }
 });
 
+// 🔍 Recherche par SIREN (depuis ton dataset local)
 app.get("/api/bigquery/:siren", async (req, res) => {
   const { siren } = req.params;
   if (!siren || !/^\d{9}$/.test(siren)) {
@@ -136,12 +111,12 @@ app.get("/api/bigquery/:siren", async (req, res) => {
   try {
     const query = `
       SELECT
-        denominationunitelegale AS Nom,
-        activiteprincipaleetablissement AS CodeNAF,
-        coordonneelambertabscisseetablissement AS x,
-        coordonneelambertordonneeetablissement AS y,
-        codepostaletablissement,
-        libellecommuneetablissement
+        denominationUsuelleEtablissement AS Nom,
+        activitePrincipaleEtablissement AS CodeNAF,
+        coordonneeLambertAbscisseEtablissement AS x,
+        coordonneeLambertOrdonneeEtablissement AS y,
+        codePostalEtablissement,
+        libelleCommuneEtablissement
       FROM \`application-map-458717.sirene_data.etablissements\`
       WHERE siren = @siren
       LIMIT 1
@@ -154,7 +129,6 @@ app.get("/api/bigquery/:siren", async (req, res) => {
     };
 
     const [rows] = await bigquery.query(options);
-
     if (rows.length === 0) {
       return res.status(404).json({ error: "Entreprise non trouvée dans BigQuery" });
     }
@@ -173,7 +147,7 @@ app.get("/api/bigquery/:siren", async (req, res) => {
       Nom: row.Nom || "Entreprise",
       Latitude: latitude,
       Longitude: longitude,
-      Adresse: `${row.codepostaletablissement || ""} ${row.libellecommuneetablissement || ""}`.trim(),
+      Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
       CodeNAF: row.CodeNAF,
       Type: "Recherche",
     }]);
