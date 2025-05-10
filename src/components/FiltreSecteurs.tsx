@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import nafCodes from "../data/naf-codes-enriched.json";
-import { FaChevronDown, FaChevronUp, FaSearch, FaBroom } from "react-icons/fa";
+import { FaSearch } from "react-icons/fa";
 import toast from "react-hot-toast";
 import { fetchCompaniesByNAF_BQ } from "../services/apiUtils";
 import { BQCompanyData } from "../services/apiUtils";
@@ -9,29 +9,15 @@ interface Props {
   center: [number, number];
   onSearchResults: (data: BQCompanyData[]) => void;
   radius: number;
-  onRadiusChange: (radius: number) => void;
 }
 
-const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRadiusChange }) => {
+const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) => {
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState(false);
-  const [selectedNaf, setSelectedNaf] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const filteredNaf = nafCodes.filter((n) =>
-    n.label.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleNafSelection = (id: string) => {
-    setSelectedNaf(prev => (prev === id ? null : id));
-  };
-
-  const clearSelection = () => {
-    setSelectedNaf(null);
-    toast.success("✅ Sélection vidée !");
-  };
-
   const handleSearch = async () => {
+    const selectedNaf = nafCodes.find((n) => n.label.toLowerCase().includes(search.toLowerCase()));
+    
     if (!selectedNaf) {
       toast.error("❗ Sélectionnez un secteur d'activité !");
       return;
@@ -42,25 +28,11 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
     toast.loading(`🔎 Recherche secteur en cours...`, { id: "search-loading" });
 
     try {
-      const nafObj = nafCodes.find((n) => n.id === selectedNaf);
-      if (!nafObj) throw new Error("Code NAF non trouvé dans la base.");
+      const results = await fetchCompaniesByNAF_BQ(selectedNaf.id, lat, lng, radius);
+      onSearchResults(results);
 
-      const nafCodesToSearch = [nafObj.id, ...(nafObj.related || [])];
-      const allResults: BQCompanyData[] = [];
-
-      for (const naf of nafCodesToSearch) {
-        try {
-          const results = await fetchCompaniesByNAF_BQ(naf, lat, lng, radius);
-          allResults.push(...results);
-        } catch (err) {
-          console.error(`Erreur BigQuery pour le code NAF ${naf}`, err);
-        }
-      }
-
-      onSearchResults(allResults);
-
-      if (allResults.length > 0) {
-        toast.success(`✅ ${allResults.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
+      if (results.length > 0) {
+        toast.success(`✅ ${results.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
       } else {
         toast.error("❗ Aucun établissement trouvé.", { id: "search-loading" });
       }
@@ -86,59 +58,9 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius, onRa
           className="pl-10 w-full border rounded p-2"
         />
       </div>
-
-      <div className="flex justify-between items-center mb-2">
-        <label className="font-medium">Rayon : {radius} km</label>
-        <button onClick={() => setExpanded(prev => !prev)} className="text-blue-600">
-          {expanded ? <FaChevronUp /> : <FaChevronDown />}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="max-h-64 overflow-y-auto border rounded p-2 grid grid-cols-3 gap-2">
-          {filteredNaf.map((n) => (
-            <label
-              key={n.id}
-              className="flex items-center gap-2 p-1 rounded hover:bg-gray-100 cursor-pointer text-sm"
-            >
-              <input
-                type="radio"
-                name="naf-selection"
-                value={n.id}
-                checked={selectedNaf === n.id}
-                onChange={() => handleNafSelection(n.id)}
-              />
-              {n.label}
-            </label>
-          ))}
-        </div>
-      )}
-
-      <input
-        type="range"
-        min="1"
-        max="50"
-        value={radius}
-        onChange={(e) => onRadiusChange(Number(e.target.value))}
-        className="w-full mt-4"
-      />
-
-      <div className="flex flex-col gap-2 mt-4">
-        <button
-          onClick={handleSearch}
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-800 disabled:opacity-50"
-        >
-          {loading ? "🔍 Recherche..." : "🔎 Lancer la recherche"}
-        </button>
-
-        <button
-          onClick={clearSelection}
-          className="w-full flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 rounded-lg text-sm"
-        >
-          <FaBroom className="mr-2" /> Vider la sélection
-        </button>
-      </div>
+      <button onClick={handleSearch} disabled={loading} className="btn-search">
+        🔎 Lancer la recherche
+      </button>
     </div>
   );
 };

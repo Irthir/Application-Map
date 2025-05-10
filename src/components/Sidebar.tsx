@@ -1,51 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import SearchAPE from "./SearchAPE";
 import FiltreSecteurs from "./FiltreSecteurs";
-import { FaEye, FaEyeSlash, FaMapMarkerAlt, FaTimes, FaFileCsv, FaTrashAlt } from "react-icons/fa";
-import { DataPoint } from "../type.ts";
+import { FaTrashAlt } from "react-icons/fa";
+import { DataPoint } from "../type";
 import { toast } from "react-hot-toast";
 
 interface SidebarProps {
   data: DataPoint[];
   onUpload: (data: DataPoint[]) => void;
-  onFilter: (radius: number) => void;
   onSearchResults: (data: any[]) => void;
-  onCenter: (lat: number, lon: number) => void;
-  onToggleVisibility: (nom: string) => void;
-  hiddenMarkers: string[];
-  onSetType: (nom: string, type: "Client" | "Prospect") => void;
-  onExport: () => void;
-  onDownloadTemplate: () => void;
-  onRemoveItem: (nom: string) => void;
   mapCenter: [number, number];
   filterRadius: number;
-  setFilterRadius: (radius: number) => void;
   onClearRecherche: () => void;
+  onClearCache: () => void;
+  onSetType: (nom: string, type: "Client" | "Prospect") => void; // Ajout de onSetType
+  onRemoveItem: (nom: string) => void; // Ajout de onRemoveItem
 }
 
 const Sidebar = ({
   data,
   onUpload,
-  onFilter,
   onSearchResults,
-  onCenter,
-  onToggleVisibility,
-  hiddenMarkers,
-  onSetType,
-  onExport,
-  onDownloadTemplate,
-  onRemoveItem,
   mapCenter,
   filterRadius,
-  setFilterRadius,
   onClearRecherche,
+  onClearCache,
+  onSetType,
+  onRemoveItem
 }: SidebarProps) => {
   const [globalLoading, setGlobalLoading] = useState(false);
-
-  const handleRadiusChange = (radius: number) => {
-    setFilterRadius(radius);
-    onFilter(radius);
-  };
 
   const wrappedOnSearchResults = async (promise: Promise<any[]>) => {
     setGlobalLoading(true);
@@ -64,44 +47,6 @@ const Sidebar = ({
       setGlobalLoading(false);
     }
   };
-
-  // 🔄 Écouteur "Rechercher similaires" (version BigQuery)
-  useEffect(() => {
-    const handleSearchSimilar = async (e: Event) => {
-      const { nom, naf } = (e as CustomEvent<{ nom: string; naf: string }>).detail;
-      const ref = data.find((d) => d.Nom === nom);
-      if (!ref || !naf || !ref.Latitude || !ref.Longitude) {
-        toast.error("❗ Impossible de lancer la recherche similaire.");
-        return;
-      }
-
-      setGlobalLoading(true);
-      try {
-        const queryURL = `/api/bigquery-activite?naf=${encodeURIComponent(naf)}&lat=${ref.Latitude}&lng=${ref.Longitude}&radius=${filterRadius}`;
-        const res = await fetch(queryURL);
-        const results = await res.json();
-
-        // 🔁 Ancienne version avec l'API INSEE (désactivée)
-        // const queryURL = `/api/insee-activite?naf=${naf}&lat=${ref.Latitude}&lng=${ref.Longitude}&radius=${filterRadius}`;
-        // const res = await fetch(queryURL);
-
-        if (res.ok && Array.isArray(results)) {
-          onSearchResults(results);
-          toast.success(`✅ ${results.length} entreprise(s) similaire(s) trouvée(s) !`);
-        } else {
-          toast.error("❗ Aucune entreprise trouvée ou erreur API.");
-        }
-      } catch (err) {
-        console.error("Erreur recherche similaire :", err);
-        toast.error("❗ Échec de la recherche similaire.");
-      } finally {
-        setGlobalLoading(false);
-      }
-    };
-
-    window.addEventListener("search-similar", handleSearchSimilar);
-    return () => window.removeEventListener("search-similar", handleSearchSimilar);
-  }, [data, filterRadius, onSearchResults]);
 
   const clearAllData = () => {
     if (confirm("Voulez-vous vraiment tout supprimer ?")) {
@@ -128,7 +73,6 @@ const Sidebar = ({
           center={mapCenter}
           onSearchResults={(data) => wrappedOnSearchResults(Promise.resolve(data))}
           radius={filterRadius}
-          onRadiusChange={handleRadiusChange}
         />
       </section>
 
@@ -162,80 +106,51 @@ const Sidebar = ({
                 <div className="text-xs text-gray-500">
                   {item.Adresse}
                   {item.Distance && (
-                    <span className="ml-2 text-blue-500 font-semibold">({item.Distance} km)</span>
+                    <span className="ml-2 text-blue-500 font-semibold">
+                      ({item.Distance} km)
+                    </span>
                   )}
                 </div>
               )}
-
               {item.Secteur && (
                 <div className="text-xs italic text-gray-400">
-                  Code NAF : {item.Secteur}
+                  Secteur : {item.Secteur}
                 </div>
               )}
-
-              <div className="flex gap-2 mt-1">
-                <button onClick={() => onCenter(item.Latitude, item.Longitude)} className="p-1 rounded bg-blue-100 hover:bg-blue-200" title="Centrer sur la carte">
-                  <FaMapMarkerAlt className="text-blue-600" />
-                </button>
-
-                <button onClick={() => onToggleVisibility(item.Nom)} className="p-1 rounded bg-gray-100 hover:bg-gray-200" title={hiddenMarkers.includes(item.Nom) ? "Afficher" : "Masquer"}>
-                  {hiddenMarkers.includes(item.Nom) ? <FaEyeSlash /> : <FaEye />}
-                </button>
-
-                {item.CodeNAF && item.CodeNAF.length >= 5 ? (
-                  <button
-                    onClick={() => window.dispatchEvent(new CustomEvent("search-similar", { detail: { nom: item.Nom, naf: item.CodeNAF } }))}
-                    className="p-1 rounded bg-indigo-100 hover:bg-indigo-200 text-xs"
-                    title="Rechercher similaires"
-                  >
-                    🔍 Similaires
-                  </button>
-                ) : (
-                  <button className="p-1 rounded bg-gray-200 text-gray-400 text-xs" title="Code NAF manquant" onClick={() => toast.error("❗ Aucun code NAF valide pour cette entreprise")}>
-                    🚫
-                  </button>
-                )}
-              </div>
-
-              <div className="flex gap-2 mt-1 text-xs">
-                <button onClick={() => onSetType(item.Nom, "Client")} className="flex-1 bg-green-100 text-green-700 py-1 rounded hover:bg-green-200">
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => onSetType(item.Nom, "Client")}
+                  className="bg-green-100 text-green-700 py-1 px-2 rounded text-xs"
+                >
                   Client
                 </button>
-                <button onClick={() => onSetType(item.Nom, "Prospect")} className="flex-1 bg-yellow-100 text-yellow-700 py-1 rounded hover:bg-yellow-200">
+                <button
+                  onClick={() => onSetType(item.Nom, "Prospect")}
+                  className="bg-yellow-100 text-yellow-700 py-1 px-2 rounded text-xs"
+                >
                   Prospect
                 </button>
+                <button
+                  onClick={() => onRemoveItem(item.Nom)}
+                  className="bg-red-100 text-red-700 py-1 px-2 rounded text-xs"
+                >
+                  <FaTrashAlt />
+                </button>
               </div>
-
-              <button
-                onClick={() => onRemoveItem(item.Nom)}
-                className="absolute top-2 right-2 text-gray-400 hover:text-red-600 text-lg"
-                title="Supprimer"
-              >
-                <FaTimes />
-              </button>
             </li>
           ))}
         </ul>
       </section>
 
-      {/* Export section */}
-      <section className="space-y-2 border-t pt-4">
-        <h2 className="text-lg font-semibold text-gray-700">📦 Exporter</h2>
-
+      {/* Cache clear button */}
+      <div className="mt-4">
         <button
-          onClick={onExport}
-          className="w-full flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white py-2 rounded hover:from-blue-600 hover:to-blue-800"
+          onClick={onClearCache}
+          className="w-full bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400 text-sm"
         >
-          <FaFileCsv className="mr-2" /> Exporter CSV
+          🗑️ Vider le cache
         </button>
-
-        <button
-          onClick={onDownloadTemplate}
-          className="w-full flex items-center justify-center bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200"
-        >
-          <FaFileCsv className="mr-2" /> Télécharger modèle
-        </button>
-      </section>
+      </div>
     </aside>
   );
 };

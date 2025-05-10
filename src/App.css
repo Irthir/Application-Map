@@ -72,3 +72,43 @@ html, body, #root {
 .import-button-overlay > * {
   pointer-events: auto; /* <-- seulement les enfants (bouton importer) peuvent recevoir les clics */
 }
+
+
+/* Floating panel styles */
+
+.fixed {
+  position: fixed;
+}
+
+.bottom-0 {
+  bottom: 0;
+}
+
+.left-0 {
+  left: 0;
+}
+
+.right-0 {
+  right: 0;
+}
+
+.bg-white {
+  background-color: white;
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+.z-50 {
+  z-index: 50;
+}
+
+.max-h-400px {
+  max-height: 400px;
+}
+
+.overflow-y-auto {
+  overflow-y: auto;
+}
+/* 
