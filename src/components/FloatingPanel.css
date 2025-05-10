@@ -1,113 +1,144 @@
+/* FloatingPanel.css */
+
 .floating-panel {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    width: 320px;
-    background-color: #ffffffee;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-    z-index: 10;
-  }
-  
-  .tabs {
-    display: flex;
-    background-color: #f5f5f5;
-  }
-  
-  .tab {
-    flex: 1;
-    padding: 8px;
-    cursor: pointer;
-    text-align: center;
-    font-weight: bold;
-    border-bottom: 2px solid transparent;
-    background-color: #f5f5f5;
-  }
-  
-  .tab.active {
-    border-bottom: 2px solid #007bff;
-    background-color: white;
-  }
-  
-  .search-bar {
-    display: flex;
-    align-items: center;
-    padding: 5px;
-    border-bottom: 1px solid #eaeaea;
-  }
-  
-  .search-icon {
-    margin-right: 5px;
-    color: #999;
-  }
-  
-  .search-bar input {
-    flex: 1;
-    border: none;
-    outline: none;
-    font-size: 14px;
-  }
-  
-  .sector-filter {
-    width: 100%;
-    padding: 5px;
-    border: none;
-    border-bottom: 1px solid #eaeaea;
-    outline: none;
-    font-size: 14px;
-    background-color: #ffffffee;
-  }
-  
-  .panel-content {
-    max-height: 400px;
-    overflow-y: auto;
-  }
-  
-  .panel-item {
-    padding: 10px;
-    border-bottom: 1px solid #eaeaea;
-    background-color: white;
-    position: relative;
-  }
-  
-  .item-header {
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    margin-bottom: 5px;
-  }
-  
-  .item-address {
-    font-size: 12px;
-    color: #555;
-    margin-bottom: 8px;
-  }
-  
-  .item-actions {
-    display: flex;
-    gap: 8px;
-  }
-  
-  .action-btn {
-    background-color: #f0f0f0;
-    border: none;
-    border-radius: 4px;
-    padding: 4px;
-    cursor: pointer;
-  }
-  
-  .action-btn:hover {
-    background-color: #e0e0e0;
-  }
-  
-  .action-btn.remove {
-    color: red;
-  }
-  
-  .no-results {
-    text-align: center;
-    padding: 20px;
-    color: #999;
-  }
-  
+  position: absolute;
+  bottom: 10px; /* Placer la boîte plus près du bas de la carte */
+  right: 5%; /* Position à droite de la carte */
+  width: 35%; /* Limiter la largeur de la boîte à 35% de la carte */
+  background-color: rgba(0, 0, 0, 0.8); /* Fond plus sombre */
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+  color: white; /* Texte en blanc */
+  font-size: 14px; /* Ajustement de la taille de police */
+  overflow-y: auto; /* Permettre le défilement si le contenu est trop long */
+}
+
+/* Masquer la boîte flottante */
+.floating-panel.hidden {
+  display: none;
+}
+
+/* Ajouter un style pour les boutons de masquage */
+.floating-panel .toggle-btn {
+  position: absolute;
+  top: -25px;
+  right: 20px;
+  background-color: transparent;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.floating-panel .toggle-btn:focus {
+  outline: none;
+}
+
+/* Autres styles pour les éléments de la boîte flottante */
+.tabs {
+  display: flex;
+  background-color: #333; /* Fond plus sombre pour les onglets */
+}
+
+.tab {
+  flex: 1;
+  padding: 10px;
+  cursor: pointer;
+  text-align: center;
+  font-weight: bold;
+  border-bottom: 2px solid transparent;
+  background-color: #333; /* Fond sombre pour un meilleur contraste */
+  color: white; /* Texte en blanc */
+}
+
+.tab.active {
+  border-bottom: 2px solid #007bff;
+  background-color: #444; /* Fond plus foncé pour l'onglet actif */
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  padding: 5px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.search-icon {
+  margin-right: 5px;
+  color: #999;
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  padding: 5px;
+  background-color: rgba(255, 255, 255, 0.8); /* Améliorer la lisibilité du champ de recherche */
+  color: black;
+}
+
+.sector-filter {
+  width: 100%;
+  padding: 5px;
+  border: none;
+  border-bottom: 1px solid #eaeaea;
+  outline: none;
+  font-size: 14px;
+  background-color: #1f2937; /* Fond plus foncé pour le sélecteur de secteurs */
+  color: white; /* Texte en blanc pour une meilleure lisibilité */
+}
+
+.panel-content {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.panel-item {
+  padding: 10px;
+  border-bottom: 1px solid #eaeaea;
+  background-color: white;
+  position: relative;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.item-address {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.action-btn.remove {
+  color: red;
+}
+
+.no-results {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Map from "./components/Map";
 import Sidebar from "./components/Sidebar";
 import FloatingPanel from "./components/FloatingPanel";
@@ -11,7 +11,7 @@ const LOCAL_STORAGE_KEY = "application-map-data";
 
 const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
-  const [filterRadius, setFilterRadius] = useState<number>(5);
+  const [filterRadius, setFilterRadius] = useState<number>(5); // Rayon de recherche
   const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -37,13 +37,6 @@ const App = () => {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
-  // Fonction pour uploader les données (exemple de gestion des données)
-  const onUpload = (newData: DataPoint[]) => {
-    setData(newData);
-    setUnsavedChanges(true);
-    toast.success("✅ Données mises à jour !");
-  };
-
   // 🔄 Supprimer les anciens résultats de type "Recherche"
   const removeRechercheMarkers = () => {
     setData((prev) => prev.filter((d) => d.Type !== "Recherche"));
@@ -64,18 +57,24 @@ const App = () => {
   // 🔎 Recherche similaire par événement personnalisé
   useEffect(() => {
     const handleSearchSimilar = async (e: Event) => {
-      const { naf, lat, lng } = (e as CustomEvent<{ naf: string; lat: number; lng: number }>).detail;
-
+      const { naf, lat, lng } = (e as CustomEvent<{
+        naf: string;
+        lat: number;
+        lng: number;
+      }>).detail;
+      
       if (!naf || !lat || !lng) {
         toast.error("❗ Information manquante pour la recherche.");
         return;
       }
 
       removeRechercheMarkers();
-      toast.loading("🔎 Recherche d'entreprises similaires...");
+      toast.loading(`🔎 Recherche d'entreprises similaires...`);
 
       try {
-        const url = `${API_BASE}/api/bigquery-activite?naf=${encodeURIComponent(naf)}&lat=${lat}&lng=${lng}&radius=${filterRadius}`;
+        const url = `${API_BASE}/api/bigquery-activite?naf=${encodeURIComponent(
+          naf
+        )}&lat=${lat}&lng=${lng}&radius=${filterRadius}`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error("Erreur serveur");
@@ -123,13 +122,13 @@ const App = () => {
   }, []);
 
   // 🎯 Centrage automatique
-  const autoCenter = useCallback((entries: DataPoint[]) => {
+  const autoCenter = (entries: DataPoint[]) => {
     if (entries.length === 0) return;
     const avgLat = entries.reduce((sum, e) => sum + e.Latitude, 0) / entries.length;
     const avgLon = entries.reduce((sum, e) => sum + e.Longitude, 0) / entries.length;
     setMapCenter([avgLon, avgLat]);
     setFilterRadius(5);
-  }, []);
+  };
 
   // 🗺️ Carte : centrage et filtres
   const handleCenterMap = (lat: number, lon: number) => {
@@ -143,7 +142,6 @@ const App = () => {
     );
   };
 
-  // 🎯 Marquage client/prospect
   const handleSetType = (nom: string, type: "Client" | "Prospect") => {
     setData((prev) => prev.map((d) => (d.Nom === nom ? { ...d, Type: type } : d)));
     setUnsavedChanges(true);
@@ -165,20 +163,26 @@ const App = () => {
     <div className="app-container">
       <Sidebar
         data={data}
-        onUpload={onUpload}  // Ajout de onUpload ici
+        onUpload={setData}
         onSearchResults={handleSearchResults}
+        onCenter={handleCenterMap}
+        onToggleVisibility={toggleMarkerVisibility}
+        hiddenMarkers={hiddenMarkers}
+        onSetType={handleSetType}
+        onRemoveItem={handleRemoveItem}
         mapCenter={mapCenter}
-        filterRadius={filterRadius}
+        filterRadius={filterRadius} // Passer filterRadius dans Sidebar
+        setFilterRadius={setFilterRadius} // Passer la fonction setFilterRadius ici
         onClearRecherche={removeRechercheMarkers}
         onClearCache={clearCache}
-        onSetType={handleSetType} // Ajout de onSetType
-        onRemoveItem={handleRemoveItem} // Ajout de onRemoveItem
+        onFilter={setFilterRadius} // Passer la fonction pour ajuster le rayon
       />
+
       <main className="map-container">
         <Map
           data={data.filter((d) => !hiddenMarkers.includes(d.Nom))}
           center={mapCenter}
-          filterRadius={filterRadius}
+          filterRadius={filterRadius} // Passer le radius à Map
           onClickSetCenter={(lat, lon) => handleCenterMap(lat, lon)}
         />
         <FloatingPanel
@@ -187,6 +191,8 @@ const App = () => {
           onRemoveItem={handleRemoveItem}
           onToggleVisibility={toggleMarkerVisibility}
           hiddenMarkers={hiddenMarkers}
+          filterRadius={filterRadius} // Passer filterRadius ici
+          onFilter={setFilterRadius} // Passer la fonction pour ajuster le radius
         />
         <Toaster position="top-center" />
       </main>

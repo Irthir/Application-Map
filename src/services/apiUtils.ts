@@ -23,6 +23,7 @@ export const fetchCompanyBySIREN = async (siren: string): Promise<InseeCompanyDa
 
 // 🔍 Récupération via BigQuery : SIREN
 export interface BQCompanyData {
+  Secteur: string | boolean | null;  // Secteur peut être une chaîne de caractères, un booléen ou null
   Nom: string;
   Latitude: number;
   Longitude: number;
@@ -31,6 +32,7 @@ export interface BQCompanyData {
   Type: "Recherche";
   Distance?: string;
 }
+
 
 export const fetchCompanyBySIREN_BQ = async (siren: string): Promise<BQCompanyData[]> => {
   const formattedSiren = siren.replace(/\s+/g, "");

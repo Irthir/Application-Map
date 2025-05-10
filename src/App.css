@@ -1,5 +1,7 @@
 /* App.css */
 
+/* App.css */
+
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -12,8 +14,8 @@ html, body, #root {
 }
 
 .sidebar {
-  width: 20%;
-  background-color: #1f2937; /* gris foncé (equiv. Tailwind bg-gray-800) */
+  width: 20%; /* Largeur de la sidebar */
+  background-color: #1f2937; /* gris foncé */
   color: white;
   padding: 20px;
   overflow-y: auto;
@@ -30,8 +32,6 @@ html, body, #root {
   padding-bottom: 4px;
   margin-bottom: 4px;
 }
-
-
 
 .map-container {
   flex: 1;  /* Prend tout l'espace restant */
@@ -73,41 +73,116 @@ html, body, #root {
   pointer-events: auto; /* <-- seulement les enfants (bouton importer) peuvent recevoir les clics */
 }
 
-
 /* Floating panel styles */
-
-.fixed {
+.floating-panel {
+  background-color: rgba(0, 0, 0, 0.8); /* Fond sombre transparent */
+  color: white; /* Texte en blanc */
+  padding: 16px; /* Augmenter légèrement le padding pour plus d'espace */
+  border-radius: 8px;
   position: fixed;
+  bottom: 20px; /* Ajuster la position par rapport au bas de la page */
+  right: 5%; /* Coller la box à droite avec un petit espacement */
+  width: 35%; /* Limiter la largeur de la box à 35% de la largeur de l'écran */
+  z-index: 10;
+  text-align: left; /* Aligner le texte à gauche */
+  font-size: 14px; /* Taille de texte ajustée */
+  max-height: 250px; /* Limiter la hauteur de la box */
+  overflow-y: auto; /* Permettre le défilement si nécessaire */
 }
 
-.bottom-0 {
-  bottom: 0;
+/* Masquer la boîte flottante */
+.floating-panel.hidden {
+  display: none;
 }
 
-.left-0 {
-  left: 0;
+/* Ajouter un style pour les boutons de masquage */
+.floating-panel .toggle-btn {
+  position: absolute;
+  top: -25px;  /* Position au-dessus de la box flottante */
+  right: 20px;
+  background-color: transparent;
+  border: none;
+  color: white;
+  font-size: 24px; /* Taille plus grande pour être plus visible */
+  cursor: pointer;
 }
 
-.right-0 {
-  right: 0;
+.floating-panel .toggle-btn:focus {
+  outline: none;
 }
 
-.bg-white {
-  background-color: white;
+/* Nouveau style pour la boîte de recherche par secteur dans la sidebar */
+.sidebar input,
+.sidebar select {
+  background-color: rgba(255, 255, 255, 0.95); /* Fond plus clair mais légèrement transparent */
+  color: black; /* Texte noir pour une meilleure lisibilité */
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  margin-top: 10px;
 }
 
-.shadow-lg {
-  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+.sidebar select {
+  background-color: #1f2937; /* Fond plus foncé pour le menu déroulant */
+  color: white; /* Texte blanc pour une meilleure lisibilité */
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
 }
 
-.z-50 {
-  z-index: 50;
+.sidebar button.btn-search {
+  background-color: #1f2937; /* Fond gris foncé */
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  margin-top: 10px;
 }
 
-.max-h-400px {
-  max-height: 400px;
+.sidebar button.btn-search:disabled {
+  background-color: #ccc; /* Désactivation du bouton */
+  cursor: not-allowed;
 }
 
-.overflow-y-auto {
-  overflow-y: auto;
+/* Style pour le bouton de réaffichage */
+.reveal-btn {
+  position: fixed;
+  bottom: 20px; /* Positionné en bas de l'écran */
+  right: 5%; /* Collé à droite */
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 10px;
+  border-radius: 50%;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 20; /* S'assurer qu'il est visible */
+}
+
+/* Masquer le bouton de réaffichage quand la boîte flottante est visible */
+.floating-panel.hidden + .reveal-btn {
+  display: block; /* Afficher quand la boîte flottante est masquée */
+}
+
+.reveal-btn:focus {
+  outline: none;
+}
+
+/* Style pour l'input range de l'ajustement du rayon de recherche */
+.floating-panel .radius-input {
+  margin-top: 10px;
+  padding: 10px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  color: black;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+.floating-panel .radius-input input {
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  color: white;
+  padding: 5px 0;
 }

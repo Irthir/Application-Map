@@ -13,8 +13,13 @@ interface SidebarProps {
   filterRadius: number;
   onClearRecherche: () => void;
   onClearCache: () => void;
-  onSetType: (nom: string, type: "Client" | "Prospect") => void; // Ajout de onSetType
-  onRemoveItem: (nom: string) => void; // Ajout de onRemoveItem
+  onSetType: (nom: string, type: "Client" | "Prospect") => void;
+  onRemoveItem: (nom: string) => void;
+  onCenter: (lat: number, lon: number) => void;
+  onFilter: (radius: number) => void;
+  onToggleVisibility: (nom: string) => void;
+  hiddenMarkers: string[];
+  setFilterRadius: (radius: number) => void;
 }
 
 const Sidebar = ({
@@ -26,9 +31,16 @@ const Sidebar = ({
   onClearRecherche,
   onClearCache,
   onSetType,
-  onRemoveItem
+  onRemoveItem,
+  onFilter, // Passer onFilter pour ajuster le rayon
 }: SidebarProps) => {
   const [globalLoading, setGlobalLoading] = useState(false);
+
+  // Fonction pour ajuster le rayon de recherche
+  const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newRadius = Number(e.target.value);
+    onFilter(newRadius); // Mettre à jour le rayon de recherche via la fonction passée depuis App.tsx
+  };
 
   const wrappedOnSearchResults = async (promise: Promise<any[]>) => {
     setGlobalLoading(true);
@@ -50,7 +62,7 @@ const Sidebar = ({
 
   const clearAllData = () => {
     if (confirm("Voulez-vous vraiment tout supprimer ?")) {
-      onUpload([]);
+      onUpload([]); // Effacer toutes les données
       toast.success("🗑️ Données effacées !");
     }
   };
@@ -74,6 +86,24 @@ const Sidebar = ({
           onSearchResults={(data) => wrappedOnSearchResults(Promise.resolve(data))}
           radius={filterRadius}
         />
+      </section>
+
+      {/* Rayon de recherche */}
+      <section className="space-y-4 border-t pt-4">
+        <h2 className="text-lg font-semibold text-gray-700">🎯 Rayon de recherche</h2>
+        <div className="mb-4">
+          <label htmlFor="radius" className="block text-gray-700">Rayon de recherche : {filterRadius} km</label>
+          <input
+            id="radius"
+            type="range"
+            min="1"
+            max="50"
+            step="1"
+            value={filterRadius}
+            onChange={handleRadiusChange}
+            className="w-full"
+          />
+        </div>
       </section>
 
       {/* Clients & Prospects section */}
