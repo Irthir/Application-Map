@@ -53,7 +53,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
         );
       });
 
-      onSearchResults(cleanResults);
+      onSearchResults(/*cleanResults*/results);
 
       if (cleanResults.length > 0) {
         toast.success(`✅ ${cleanResults.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });

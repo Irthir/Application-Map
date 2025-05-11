@@ -1,10 +1,11 @@
 /* FloatingPanel.css */
 
+/* Ajustements généraux du panneau flottant */
 .floating-panel {
   position: absolute;
   bottom: 10px; /* Placer la boîte plus près du bas de la carte */
-  right: 5%; /* Position à droite de la carte */
-  width: 35%; /* Limiter la largeur de la boîte à 35% de la carte */
+  right: 0; /* Coller le panneau flottant au bord droit de l'écran */
+  width: calc(100% - 20%); /* Largeur dynamique qui prend toute la place restante après la sidebar */
   background-color: rgba(0, 0, 0, 0.8); /* Fond plus sombre */
   border-radius: 8px;
   padding: 16px;
@@ -91,16 +92,25 @@
   color: white; /* Texte en blanc pour une meilleure lisibilité */
 }
 
+/* Style des éléments dans la liste avec un bon contraste */
 .panel-content {
   max-height: 400px;
   overflow-y: auto;
 }
 
+/* Le fond est plus foncé pour améliorer la lisibilité */
 .panel-item {
   padding: 10px;
   border-bottom: 1px solid #eaeaea;
-  background-color: white;
+  background-color: #2d3748; /* Fond plus foncé */
+  color: white; /* Texte blanc */
   position: relative;
+  border-radius: 8px;
+}
+
+/* Ajouter un effet au survol des éléments */
+.panel-item:hover {
+  background-color: #4a5568; /* Changer la couleur de fond au survol pour un contraste */
 }
 
 .item-header {
@@ -112,7 +122,7 @@
 
 .item-address {
   font-size: 12px;
-  color: #555;
+  color: #e2e8f0; /* Couleur plus claire pour l'adresse */
   margin-bottom: 8px;
 }
 
