@@ -16,12 +16,10 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
   const [selectedNaf, setSelectedNaf] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Filtrage des secteurs
   const filteredNaf = nafCodes.filter((n) =>
     n.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Fonction de sélection d'un secteur
   const handleNafSelection = (id: string) => {
     setSelectedNaf(id);
   };
@@ -44,16 +42,15 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
 
       // Filtrer les résultats pour enlever les entreprises avec 'undefined' ou 'Non spécifié'
       const cleanResults = results.filter((r: BQCompanyData) => {
-        // Vérifier que Secteur est une chaîne de caractères valide
-        const secteur = typeof r.Secteur === 'string' && r.Secteur !== "Non spécifié" ? r.Secteur : null;
+        const secteur = typeof r.Secteur === "string" && r.Secteur !== "Non spécifié" ? r.Secteur : null;
         return (
-          r.Nom && r.Nom !== "undefined" && 
-          secteur &&  // Vérifier que Secteur existe et est valide
+          r.Nom && r.Nom !== "undefined" &&
+          secteur &&
           r.Latitude !== undefined && r.Longitude !== undefined
         );
       });
 
-      onSearchResults(/*cleanResults*/results);
+      onSearchResults(cleanResults);
 
       if (cleanResults.length > 0) {
         toast.success(`✅ ${cleanResults.length} entreprise(s) trouvée(s) !`, { id: "search-loading" });
@@ -83,7 +80,6 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
         />
       </div>
 
-      {/* Liste déroulante des secteurs */}
       {filteredNaf.length > 0 && (
         <select
           className="w-full border rounded p-2 mt-2"

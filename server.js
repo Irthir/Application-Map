@@ -41,6 +41,34 @@ const haversineDistance = (lat1, lon1, lat2, lon2) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+// Fonction d'enrichissement des données via l'API INSEE
+const enrichDataWithINSEE = async (siren) => {
+  try {
+    const response = await fetch(`https://api.insee.fr/entreprises/sirene/V3/siren/${siren}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${process.env.INSEE_API_KEY}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Erreur API INSEE pour le SIREN: ${siren}`);
+      return null;
+    }
+
+    const data = await response.json();
+    // Exemple d'enrichissement
+    return {
+      Nom: data.entreprise.denominationUsuelleEtablissement || "Inconnu",
+      Secteur: data.entreprise.activitePrincipaleEtablissement || "Non spécifié",
+      Adresse: `${data.entreprise.codePostalEtablissement} ${data.entreprise.libelleCommuneEtablissement}`,
+    };
+  } catch (err) {
+    console.error("Erreur lors de l'appel à l'API INSEE :", err);
+    return null;
+  }
+};
+
 // 🔍 Recherche par activité (depuis ton dataset local)
 app.get("/api/bigquery-activite", async (req, res) => {
   const { naf, lat, lng, radius } = req.query;
@@ -60,7 +88,8 @@ app.get("/api/bigquery-activite", async (req, res) => {
         coordonneeLambertAbscisseEtablissement AS x,
         coordonneeLambertOrdonneeEtablissement AS y,
         codePostalEtablissement,
-        libelleCommuneEtablissement
+        libelleCommuneEtablissement,
+        siren
       FROM \`application-map-458717.sirene_data.etablissements\`
       WHERE activitePrincipaleEtablissement = @naf
       LIMIT 3000
@@ -74,27 +103,32 @@ app.get("/api/bigquery-activite", async (req, res) => {
 
     const [rows] = await bigquery.query(options);
 
-    const results = rows.map(row => {
-      const lambertX = parseFloat(row.x);
-      const lambertY = parseFloat(row.y);
-      if (isNaN(lambertX) || isNaN(lambertY)) return null;
+    const results = await Promise.all(
+      rows.map(async (row) => {
+        const lambertX = parseFloat(row.x);
+        const lambertY = parseFloat(row.y);
+        if (isNaN(lambertX) || isNaN(lambertY)) return null;
 
-      const [latitude, longitude] = LambertToWGS84(lambertX, lambertY);
-      const distance = haversineDistance(latNum, lngNum, latitude, longitude);
-      if (isNaN(distance) || distance > radiusNum) return null;
+        const [latitude, longitude] = LambertToWGS84(lambertX, lambertY);
+        const distance = haversineDistance(latNum, lngNum, latitude, longitude);
+        if (isNaN(distance) || distance > radiusNum) return null;
 
-      return {
-        Nom: row.Nom || "Entreprise",
-        Latitude: latitude,
-        Longitude: longitude,
-        Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
-        CodeNAF: row.CodeNAF,
-        Type: "Recherche",
-        Distance: distance.toFixed(2),
-      };
-    }).filter(Boolean);
+        const enrichedData = await enrichDataWithINSEE(row.siren);
 
-    res.json(results);
+        return {
+          Nom: enrichedData?.Nom || row.denominationUsuelleEtablissement || "Entreprise",
+          Latitude: latitude,
+          Longitude: longitude,
+          Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
+          CodeNAF: row.activitePrincipaleEtablissement,
+          Type: "Recherche",
+          Distance: distance.toFixed(2),
+          Secteur: enrichedData?.Secteur || "Non spécifié",
+        };
+      })
+    );
+
+    res.json(results.filter(Boolean));
   } catch (error) {
     console.error("💥 Erreur BigQuery :", error);
     res.status(500).json({ error: "Erreur BigQuery" });
@@ -143,13 +177,16 @@ app.get("/api/bigquery/:siren", async (req, res) => {
 
     const [latitude, longitude] = LambertToWGS84(lambertX, lambertY);
 
+    const enrichedData = await enrichDataWithINSEE(row.siren);
+
     res.json([{
-      Nom: row.Nom || "Entreprise",
+      Nom: enrichedData?.Nom || row.denominationUsuelleEtablissement || "Entreprise",
       Latitude: latitude,
       Longitude: longitude,
       Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
-      CodeNAF: row.CodeNAF,
+      CodeNAF: row.activitePrincipaleEtablissement,
       Type: "Recherche",
+      Secteur: enrichedData?.Secteur || "Non spécifié",
     }]);
   } catch (error) {
     console.error("💥 Erreur BigQuery SIREN :", error);
