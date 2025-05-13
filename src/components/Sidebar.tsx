@@ -18,7 +18,7 @@ interface SidebarProps {
   onToggleVisibility: (nom: string) => void;
   hiddenMarkers: string[];
   setFilterRadius: (radius: number) => void;
-  arborescence: any;  // Ajouter la structure de l'arborescence ici
+  arborescence: any;
 }
 
 const Sidebar = ({
@@ -30,7 +30,7 @@ const Sidebar = ({
   onSetType,
   onRemoveItem,
   onFilter,
-  arborescence,  // Structure des divisions et activités
+  arborescence,
 }: SidebarProps) => {
   const [globalLoading] = useState(false);
   const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
@@ -71,8 +71,8 @@ const Sidebar = ({
   };
 
   return (
-    <aside className="sidebar p-4 space-y-6">
-      <h1 className="text-2xl font-bold mb-4 text-center text-white">Application Map</h1>
+    <aside className="sidebar p-4 space-y-6 bg-white shadow-md rounded-lg">
+      <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">Application Map</h1>
 
       {globalLoading && (
         <div className="bg-blue-100 text-blue-700 p-2 text-center text-sm rounded animate-pulse">
@@ -101,7 +101,7 @@ const Sidebar = ({
             step="1"
             value={filterRadius}
             onChange={handleRadiusChange}
-            className="w-full"
+            className="w-full bg-blue-100 rounded-lg"
           />
         </div>
       </section>
@@ -116,13 +116,13 @@ const Sidebar = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => toggleDivision(division.code)}
-                className="text-blue-600"
+                className="text-blue-600 hover:text-blue-800"
               >
                 {expandedDivisions.includes(division.code) ? <FaChevronUp /> : <FaChevronDown />}
               </button>
               <label
                 onClick={() => toggleDivisionSelection(division.code)}
-                className="cursor-pointer text-sm font-semibold"
+                className="cursor-pointer text-sm font-semibold text-gray-800"
               >
                 {division.nom}
               </label>
@@ -138,8 +138,9 @@ const Sidebar = ({
                       checked={selectedDivisions.includes(activity)}
                       onChange={() => toggleActivitySelection(activity)}
                       id={`activity-${activity}`}
+                      className="rounded-md"
                     />
-                    <label htmlFor={`activity-${activity}`} className="text-sm">{activity}</label>
+                    <label htmlFor={`activity-${activity}`} className="text-sm text-gray-600">{activity}</label>
                   </div>
                 ))}
               </div>
@@ -155,13 +156,13 @@ const Sidebar = ({
         <div className="flex gap-2">
           <button
             onClick={onClearRecherche}
-            className="flex-1 bg-red-100 text-red-700 py-2 rounded hover:bg-red-200 text-sm"
+            className="flex-1 bg-red-100 text-red-700 py-2 rounded-lg hover:bg-red-200 text-sm"
           >
             Supprimer "Recherche"
           </button>
           <button
             onClick={clearAllData}
-            className="flex-1 bg-gray-100 text-gray-700 py-2 rounded hover:bg-gray-200 text-sm"
+            className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 text-sm"
           >
             <FaTrashAlt className="inline mr-1" /> Tout effacer
           </button>
@@ -171,9 +172,9 @@ const Sidebar = ({
           {data.map((item, i) => (
             <li
               key={i}
-              className="flex flex-col gap-1 p-2 rounded border border-gray-200 bg-white relative hover:shadow-md cursor-pointer transition-all hover:bg-gray-100"
+              className="flex flex-col gap-1 p-2 rounded-lg border border-gray-200 bg-white relative hover:shadow-md cursor-pointer transition-all hover:bg-gray-100"
             >
-              <div className="font-semibold">{item.Nom}</div>
+              <div className="font-semibold text-gray-800">{item.Nom}</div>
               {item.Adresse && (
                 <div className="text-xs text-gray-500">
                   {item.Adresse}
@@ -192,19 +193,19 @@ const Sidebar = ({
               <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => onSetType(item.Nom, "Client")}
-                  className="bg-green-100 text-green-700 py-1 px-2 rounded text-xs"
+                  className="bg-green-100 text-green-700 py-1 px-2 rounded-lg text-xs"
                 >
                   Client
                 </button>
                 <button
                   onClick={() => onSetType(item.Nom, "Prospect")}
-                  className="bg-yellow-100 text-yellow-700 py-1 px-2 rounded text-xs"
+                  className="bg-yellow-100 text-yellow-700 py-1 px-2 rounded-lg text-xs"
                 >
                   Prospect
                 </button>
                 <button
                   onClick={() => onRemoveItem(item.Nom)}
-                  className="bg-red-100 text-red-700 py-1 px-2 rounded text-xs"
+                  className="bg-red-100 text-red-700 py-1 px-2 rounded-lg text-xs"
                 >
                   <FaTrashAlt />
                 </button>
@@ -218,7 +219,7 @@ const Sidebar = ({
       <div className="mt-4">
         <button
           onClick={onClearCache}
-          className="w-full bg-gray-300 text-gray-700 py-2 rounded hover:bg-gray-400 text-sm"
+          className="w-full bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 text-sm"
         >
           🗑️ Vider le cache
         </button>

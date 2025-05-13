@@ -74,7 +74,7 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
       const safeNom = item.Nom.replace(/'/g, "\\'"); // Pour éviter les problèmes avec les guillemets simples
       const safeNAF = item.CodeNAF ? item.CodeNAF.replace(/'/g, "\\'") : "";
 
-      const popupHTML = `
+      const popupHTML = ` 
         <div class="popup-content">
           <strong>${item.Nom}</strong><br/>
           Type: ${item.Type || "Non marqué"}<br/>

@@ -27,7 +27,6 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
   const [sectorFilter, setSectorFilter] = useState<string | null>(null);
   const [filteredData, setFilteredData] = useState<DataPoint[]>(data);
 
-  // Filtrer les données en fonction des onglets et autres critères
   useEffect(() => {
     const filtered = data.filter(
       (item) =>
@@ -45,7 +44,6 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
     setFilteredData(finalFiltered);
   }, [data, searchTerm, sectorFilter, activeTab]);
 
-  // Obtenez les secteurs uniques des données filtrées
   const uniqueSectors = Array.from(
     new Set(
       data
@@ -54,14 +52,12 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
     )
   ).filter(Boolean);
 
-  // Changement d'onglet
   const handleTabChange = (tab: "Recherche" | "Clients" | "Prospects") => {
     setActiveTab(tab);
     setSearchTerm("");
     setSectorFilter(null);
   };
 
-  // Masquer/afficher le panneau flottant
   const [isHidden, setIsHidden] = useState<boolean>(false);
   const togglePanelVisibility = () => {
     setIsHidden(!isHidden);
@@ -69,7 +65,6 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
 
   return (
     <>
-      {/* Bouton de réaffichage */}
       <button
         onClick={togglePanelVisibility}
         className={`reveal-btn ${isHidden ? "hidden" : ""}`}
@@ -78,12 +73,10 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
       </button>
 
       <div className={`floating-panel ${isHidden ? "hidden" : ""}`}>
-        {/* Bouton de masquage */}
         <button onClick={togglePanelVisibility} className="toggle-btn">
           {isHidden ? <FaChevronUp /> : <FaChevronDown />}
         </button>
 
-        {/* Onglets */}
         <div className="tabs">
           {["Recherche", "Clients", "Prospects"].map((tab) => (
             <button
@@ -96,7 +89,6 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
           ))}
         </div>
 
-        {/* 🔎 Barre de recherche */}
         <div className="search-bar">
           <FaSearch className="search-icon" />
           <input
@@ -107,7 +99,6 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
           />
         </div>
 
-        {/* 🏷️ Filtre par secteur */}
         <select
           value={sectorFilter || ""}
           onChange={(e) => setSectorFilter(e.target.value || null)}
@@ -121,7 +112,6 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
           ))}
         </select>
 
-        {/* Liste des établissements filtrés */}
         <div className="panel-content">
           {filteredData.length > 0 ? (
             filteredData.map((item, index) => (
