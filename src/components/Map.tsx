@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import * as turf from "@turf/turf";
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_KEY || "";
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_KEY || ""; // Assurez-vous que vous avez configuré votre token Mapbox
 
 interface MapProps {
   data: { Nom: string; Latitude: number; Longitude: number; Type: string; CodeNAF?: string }[];
@@ -19,13 +19,15 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
   useEffect(() => {
     if (!mapContainer.current) return;
 
+    // Initialisation de la carte Mapbox
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v11",
+      style: "mapbox://styles/mapbox/streets-v11", // Style de carte
       center,
       zoom: 12,
     });
 
+    // Gérer le clic sur la carte pour déplacer le centre de la carte
     map.current.on("click", (e) => {
       if (!map.current) return;
 
@@ -48,6 +50,7 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
   useEffect(() => {
     if (!map.current || !center) return;
 
+    // Fly to new center position when the center is updated
     map.current.flyTo({
       center,
       zoom: 14,
@@ -58,16 +61,17 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
   useEffect(() => {
     if (!map.current) return;
 
-    // Supprimer anciens marqueurs
+    // Supprimer les anciens marqueurs
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
+    // Ajouter des marqueurs pour chaque point de données
     data.forEach((item) => {
-      let color = "#9CA3AF";
-      if (item.Type === "Client") color = "#10B981";
-      else if (item.Type === "Prospect") color = "#F59E0B";
+      let color = "#9CA3AF"; // Couleur par défaut
+      if (item.Type === "Client") color = "#10B981"; // Vert pour les Clients
+      else if (item.Type === "Prospect") color = "#F59E0B"; // Jaune pour les Prospects
 
-      const safeNom = item.Nom.replace(/'/g, "\\'");
+      const safeNom = item.Nom.replace(/'/g, "\\'"); // Pour éviter les problèmes avec les guillemets simples
       const safeNAF = item.CodeNAF ? item.CodeNAF.replace(/'/g, "\\'") : "";
 
       const popupHTML = `
@@ -95,6 +99,7 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
       if (map.current?.getLayer(circleId)) map.current.removeLayer(circleId);
       if (map.current?.getSource(circleId)) map.current.removeSource(circleId);
 
+      // Créer un cercle géospatial autour du centre
       const circle = turf.circle(center, filterRadius || 5, {
         steps: 64,
         units: "kilometers",
@@ -117,6 +122,7 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
       });
     };
 
+    // Si le style de la carte est chargé, ajoutez le cercle
     if (map.current.isStyleLoaded()) {
       addCircleLayer();
     } else {

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-//import { geocodeCompany } from "../services/apiUtils";
+// import { geocodeCompany } from "../services/apiUtils"; // Si utilisé
 
 interface SearchAPEProps {
   onResults: (data: any[]) => void;
@@ -10,75 +10,64 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
   const [input, setInput] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [debouncedInput, setDebouncedInput] = useState(input);
 
-  const handleSearch = async () => {
-    if (!input.trim() || loading) return;
+  // Debounce effect for search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedInput(input);
+    }, 500); // 500ms delay
+    return () => clearTimeout(timer);
+  }, [input]);
 
-    setSearchResults([]);
-    setLoading(true);
+  useEffect(() => {
+    if (!debouncedInput.trim() || loading) return;
 
-    try {
-      const cleanedInput = input.replace(/\s+/g, "");
-      if (/^\d{9}$/.test(cleanedInput)) {
-        // ✅ Recherche via BigQuery
-        const res = await fetch(`/api/bigquery/${cleanedInput}`);
-        if (!res.ok) {
-          toast.error("❗ Entreprise introuvable (BigQuery)");
-          return;
-        }
+    const search = async () => {
+      setSearchResults([]);
+      setLoading(true);
 
-        const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          toast.error("❗ Aucune entreprise trouvée.");
-          return;
-        }
+      try {
+        const cleanedInput = debouncedInput.replace(/\s+/g, "");
+        if (/^\d{9}$/.test(cleanedInput)) {
+          // ✅ Recherche via BigQuery
+          const res = await fetch(`/api/bigquery/${cleanedInput}`);
+          if (!res.ok) {
+            toast.error("❗ Entreprise introuvable (BigQuery)");
+            return;
+          }
 
-        const entreprise = data[0];
-        onResults([entreprise]);
-        setInput(entreprise.Nom);
-        toast.success("✅ Entreprise trouvée !");
+          const data = await res.json();
+          if (!Array.isArray(data) || data.length === 0) {
+            toast.error("❗ Aucune entreprise trouvée.");
+            return;
+          }
 
-        // 🔁 Ancienne version INSEE désactivée
-        /*
-        const companyData = await fetchCompanyBySIREN(cleanedInput);
-        const uniteLegale = companyData?.uniteLegale;
-        const activePeriod = uniteLegale?.periodesUniteLegale?.find((p: any) => p.dateFin === null);
-
-        if (!uniteLegale || !activePeriod) {
-          toast.error("❗ Informations indisponibles pour ce SIREN.");
-          return;
-        }
-
-        const nom = activePeriod.denominationUniteLegale || activePeriod.nomUniteLegale || "Entreprise";
-        const naf = activePeriod.activitePrincipaleUniteLegale || "";
-
-        const geoData = await geocodeCompany(nom);
-        if (geoData) {
-          onResults([{ Nom: nom, Latitude: geoData.lat, Longitude: geoData.lon, Type: "Recherche", Secteur: naf }]);
-          setInput(nom);
+          const entreprise = data[0];
+          onResults([entreprise]);
+          setInput(entreprise.Nom);
           toast.success("✅ Entreprise trouvée !");
         } else {
-          toast.error("❗ Localisation introuvable.");
-        }
-        */
-      } else {
-        // 🔍 Recherche géographique (libre)
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(input)}`);
-        const geoData = await geoRes.json();
+          // 🔍 Recherche géographique (libre)
+          const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=fr&q=${encodeURIComponent(debouncedInput)}`);
+          const geoData = await geoRes.json();
 
-        if (geoData.length > 0) {
-          setSearchResults(geoData.slice(0, 10));
-        } else {
-          toast.error("❗ Adresse ou nom introuvable.");
+          if (geoData.length > 0) {
+            setSearchResults(geoData.slice(0, 10));
+          } else {
+            toast.error("❗ Adresse ou nom introuvable.");
+          }
         }
+      } catch (error) {
+        console.error("Erreur de recherche :", error);
+        toast.error("❗ Erreur pendant la recherche.");
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Erreur de recherche :", error);
-      toast.error("❗ Erreur pendant la recherche.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    search();
+  }, [debouncedInput, loading, onResults]);
 
   const handleSelectResult = (result: any) => {
     setSearchResults([]);
@@ -102,7 +91,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
           placeholder="Nom, adresse ou SIREN"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          onKeyDown={(e) => e.key === "Enter" && setDebouncedInput(input)}
           className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
           disabled={loading}
         />
@@ -114,7 +103,7 @@ const SearchAPE = ({ onResults }: SearchAPEProps) => {
       </div>
 
       <button
-        onClick={handleSearch}
+        onClick={() => setDebouncedInput(input)}
         className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
         disabled={loading}
       >

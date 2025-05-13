@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { DataPoint } from "../type";
 import { FaMapMarkerAlt, FaEye, FaEyeSlash, FaTrashAlt, FaSearch, FaChevronUp, FaChevronDown } from "react-icons/fa";
-import "./FloatingPanel.css";
 
 interface FloatingPanelProps {
   data: DataPoint[];
@@ -9,10 +8,11 @@ interface FloatingPanelProps {
   onRemoveItem: (nom: string) => void;
   onToggleVisibility: (nom: string) => void;
   hiddenMarkers: string[];
-  filterRadius: number; // Ajouter filterRadius ici
-  onFilter: (radius: number) => void; // Ajouter onFilter ici
+  filterRadius: number;
+  onFilter: (radius: number) => void;
+  activeTab: "Recherche" | "Clients" | "Prospects";
+  setActiveTab: (tab: "Recherche" | "Clients" | "Prospects") => void;
 }
-
 
 const FloatingPanel: React.FC<FloatingPanelProps> = ({
   data,
@@ -20,37 +20,49 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
   onRemoveItem,
   onToggleVisibility,
   hiddenMarkers,
+  activeTab,
+  setActiveTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<"Recherche" | "Clients" | "Prospects">("Recherche");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [sectorFilter, setSectorFilter] = useState<string | null>(null);
   const [filteredData, setFilteredData] = useState<DataPoint[]>(data);
-  const [isHidden, setIsHidden] = useState(false); // Contrôler l'état de la boîte flottante
 
-  // 🔄 Mise à jour des données affichées en fonction des filtres
+  // Filtrer les données en fonction des onglets et autres critères
   useEffect(() => {
     const filtered = data.filter(
       (item) =>
-        item.Type === activeTab &&
+        (activeTab === "Recherche" && item.Type === "Recherche") ||
+        (activeTab === "Clients" && item.Type === "Client") ||
+        (activeTab === "Prospects" && item.Type === "Prospect")
+    );
+
+    const finalFiltered = filtered.filter(
+      (item) =>
         item.Nom.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (sectorFilter ? item.Secteur === sectorFilter : true)
     );
-    setFilteredData(filtered);
+
+    setFilteredData(finalFiltered);
   }, [data, searchTerm, sectorFilter, activeTab]);
 
-  // 🎯 Sélecteur de secteur actualisé par onglet
+  // Obtenez les secteurs uniques des données filtrées
   const uniqueSectors = Array.from(
-    new Set(data.filter((item) => item.Type === activeTab).map((item) => item.Secteur))
+    new Set(
+      data
+        .filter((item) => item.Type === activeTab || activeTab === "Recherche")
+        .map((item) => item.Secteur)
+    )
   ).filter(Boolean);
 
-  // 🗂️ Gestion du changement d'onglet
+  // Changement d'onglet
   const handleTabChange = (tab: "Recherche" | "Clients" | "Prospects") => {
     setActiveTab(tab);
     setSearchTerm("");
     setSectorFilter(null);
   };
 
-  // Fonction pour masquer/afficher la boîte flottante
+  // Masquer/afficher le panneau flottant
+  const [isHidden, setIsHidden] = useState<boolean>(false);
   const togglePanelVisibility = () => {
     setIsHidden(!isHidden);
   };
@@ -58,7 +70,10 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
   return (
     <>
       {/* Bouton de réaffichage */}
-      <button onClick={togglePanelVisibility} className={`reveal-btn ${isHidden ? "hidden" : ""}`}>
+      <button
+        onClick={togglePanelVisibility}
+        className={`reveal-btn ${isHidden ? "hidden" : ""}`}
+      >
         {isHidden ? <FaChevronUp /> : <FaChevronDown />}
       </button>
 
@@ -74,7 +89,7 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
             <button
               key={tab}
               className={`tab ${activeTab === tab ? "active" : ""}`}
-              onClick={() => handleTabChange(tab as any)}
+              onClick={() => handleTabChange(tab as "Recherche" | "Clients" | "Prospects")}
             >
               {tab}
             </button>
@@ -106,7 +121,7 @@ const FloatingPanel: React.FC<FloatingPanelProps> = ({
           ))}
         </select>
 
-        {/* Liste des établissements */}
+        {/* Liste des établissements filtrés */}
         <div className="panel-content">
           {filteredData.length > 0 ? (
             filteredData.map((item, index) => (

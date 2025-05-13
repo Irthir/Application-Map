@@ -1,7 +1,5 @@
 import { useState } from "react";
-import SearchAPE from "./SearchAPE";
-import FiltreSecteurs from "./FiltreSecteurs";
-import { FaTrashAlt } from "react-icons/fa";
+import { FaChevronDown, FaChevronUp, FaTrashAlt } from "react-icons/fa";
 import { DataPoint } from "../type";
 import { toast } from "react-hot-toast";
 
@@ -20,21 +18,23 @@ interface SidebarProps {
   onToggleVisibility: (nom: string) => void;
   hiddenMarkers: string[];
   setFilterRadius: (radius: number) => void;
+  arborescence: any;  // Ajouter la structure de l'arborescence ici
 }
 
 const Sidebar = ({
   data,
   onUpload,
-  onSearchResults,
-  mapCenter,
   filterRadius,
   onClearRecherche,
   onClearCache,
   onSetType,
   onRemoveItem,
-  onFilter, // Passer onFilter pour ajuster le rayon
+  onFilter,
+  arborescence,  // Structure des divisions et activités
 }: SidebarProps) => {
-  const [globalLoading, setGlobalLoading] = useState(false);
+  const [globalLoading] = useState(false);
+  const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
+  const [expandedDivisions, setExpandedDivisions] = useState<string[]>([]);
 
   // Fonction pour ajuster le rayon de recherche
   const handleRadiusChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,22 +42,25 @@ const Sidebar = ({
     onFilter(newRadius); // Mettre à jour le rayon de recherche via la fonction passée depuis App.tsx
   };
 
-  const wrappedOnSearchResults = async (promise: Promise<any[]>) => {
-    setGlobalLoading(true);
-    try {
-      const results = await promise;
-      if (results.length === 0) {
-        toast.error("❗ Aucun résultat trouvé.");
-      } else {
-        onSearchResults(results);
-        toast.success(`✅ ${results.length} résultat(s) ajouté(s) !`);
-      }
-    } catch (err) {
-      console.error("Erreur lors du traitement des résultats :", err);
-      toast.error("❗ Erreur lors du traitement des résultats.");
-    } finally {
-      setGlobalLoading(false);
-    }
+  // Fonction pour gérer l'expansion/fermeture des divisions
+  const toggleDivision = (division: string) => {
+    setExpandedDivisions((prev) =>
+      prev.includes(division) ? prev.filter((d) => d !== division) : [...prev, division]
+    );
+  };
+
+  // Fonction pour gérer la sélection/désélection des divisions
+  const toggleDivisionSelection = (division: string) => {
+    setSelectedDivisions((prev) =>
+      prev.includes(division) ? prev.filter((d) => d !== division) : [...prev, division]
+    );
+  };
+
+  // Fonction pour gérer la sélection/désélection des activités
+  const toggleActivitySelection = (activity: string) => {
+    setSelectedDivisions((prev) =>
+      prev.includes(activity) ? prev.filter((d) => d !== activity) : [...prev, activity]
+    );
   };
 
   const clearAllData = () => {
@@ -69,7 +72,7 @@ const Sidebar = ({
 
   return (
     <aside className="sidebar p-4 space-y-6">
-      <h1 className="text-2xl font-bold mb-4 text-center">Application Map</h1>
+      <h1 className="text-2xl font-bold mb-4 text-center text-white">Application Map</h1>
 
       {globalLoading && (
         <div className="bg-blue-100 text-blue-700 p-2 text-center text-sm rounded animate-pulse">
@@ -80,19 +83,16 @@ const Sidebar = ({
       {/* Recherche section */}
       <section className="space-y-4 border-t pt-4">
         <h2 className="text-lg font-semibold text-gray-700">🔎 Recherche</h2>
-        <SearchAPE onResults={(data) => wrappedOnSearchResults(Promise.resolve(data))} />
-        <FiltreSecteurs
-          center={mapCenter}
-          onSearchResults={(data) => wrappedOnSearchResults(Promise.resolve(data))}
-          radius={filterRadius}
-        />
+        {/* Ajoutez ici votre composant de recherche */}
       </section>
 
       {/* Rayon de recherche */}
       <section className="space-y-4 border-t pt-4">
         <h2 className="text-lg font-semibold text-gray-700">🎯 Rayon de recherche</h2>
         <div className="mb-4">
-          <label htmlFor="radius" className="block text-gray-700">Rayon de recherche : {filterRadius} km</label>
+          <label htmlFor="radius" className="block text-gray-700">
+            Rayon de recherche : {filterRadius} km
+          </label>
           <input
             id="radius"
             type="range"
@@ -104,6 +104,48 @@ const Sidebar = ({
             className="w-full"
           />
         </div>
+      </section>
+
+      {/* Divisions et activités */}
+      <section className="space-y-4 border-t pt-4">
+        <h2 className="text-lg font-semibold text-gray-700">🌍 Divisions et Activités</h2>
+
+        {arborescence.map((division: any) => (
+          <div key={division.code} className="space-y-2">
+            {/* Division */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toggleDivision(division.code)}
+                className="text-blue-600"
+              >
+                {expandedDivisions.includes(division.code) ? <FaChevronUp /> : <FaChevronDown />}
+              </button>
+              <label
+                onClick={() => toggleDivisionSelection(division.code)}
+                className="cursor-pointer text-sm font-semibold"
+              >
+                {division.nom}
+              </label>
+            </div>
+
+            {/* Activités */}
+            {expandedDivisions.includes(division.code) && (
+              <div className="ml-4 space-y-2">
+                {division.activites.map((activity: string) => (
+                  <div key={activity} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedDivisions.includes(activity)}
+                      onChange={() => toggleActivitySelection(activity)}
+                      id={`activity-${activity}`}
+                    />
+                    <label htmlFor={`activity-${activity}`} className="text-sm">{activity}</label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </section>
 
       {/* Clients & Prospects section */}
@@ -129,7 +171,7 @@ const Sidebar = ({
           {data.map((item, i) => (
             <li
               key={i}
-              className="flex flex-col gap-1 p-2 rounded border border-gray-200 bg-white relative hover:shadow-md"
+              className="flex flex-col gap-1 p-2 rounded border border-gray-200 bg-white relative hover:shadow-md cursor-pointer transition-all hover:bg-gray-100"
             >
               <div className="font-semibold">{item.Nom}</div>
               {item.Adresse && (

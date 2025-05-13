@@ -1,29 +1,42 @@
 import { useState, useEffect, useCallback } from "react";
-import Map from "./components/Map";
 import Sidebar from "./components/Sidebar";
+import Map from "./components/Map";
 import FloatingPanel from "./components/FloatingPanel";
 import { DataPoint } from "./type";
 import { Toaster, toast } from "react-hot-toast";
 import "mapbox-gl/dist/mapbox-gl.css";
-import "./App.css";
+
+// Exemple de structure d'arborescence statique
+const arborescenceData = [
+  {
+    code: "01",
+    nom: "Culture et production animale",
+    activites: [
+      "Culture de céréales",
+      "Culture de légumes",
+      "Élevage de vaches laitières"
+    ]
+  },
+  {
+    code: "02",
+    nom: "Sylviculture et exploitation forestière",
+    activites: [
+      "Exploitation forestière",
+      "Récolte de produits forestiers"
+    ]
+  },
+  // Ajoutez plus de divisions et d'activités ici si nécessaire
+];
 
 const LOCAL_STORAGE_KEY = "application-map-data";
-
-// Fonction de calcul de distance (Haversine) entre deux points (latitude, longitude)
-/*const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const R = 6371; // Rayon de la Terre en kilomètres
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};*/
 
 const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
   const [filterRadius, setFilterRadius] = useState<number>(5); // Rayon de recherche
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
   const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"Recherche" | "Clients" | "Prospects">("Recherche"); // Onglet actif
+  const [arborescence] = useState<any[]>(arborescenceData); // Structure des divisions et activités
 
   // 🚀 Chargement des données depuis le cache local
   useEffect(() => {
@@ -57,7 +70,7 @@ const App = () => {
           Secteur: r.Secteur || "Non spécifié",
           CodeNAF: r.CodeNAF || "",
           SIREN: r.SIREN || "",  // Assurez-vous d'inclure le SIREN
-          Type: "Recherche",
+          Type: "Recherche",  // Initialement type "Recherche"
         };
       });
 
@@ -77,7 +90,7 @@ const App = () => {
 
   // Toggle de visibilité pour les markers
   const toggleVisibility = (nom: string) => {
-    setHiddenMarkers((prev) => 
+    setHiddenMarkers((prev) =>
       prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]
     );
   };
@@ -85,6 +98,20 @@ const App = () => {
   // Fonction pour supprimer un item
   const removeItem = (nom: string) => {
     setData((prev) => prev.filter((d) => d.Nom !== nom));
+  };
+
+  // Fonction pour mettre à jour le type d'une entreprise
+  const handleSetType = (nom: string, type: "Client" | "Prospect") => {
+    setData((prev) =>
+      prev.map((d) =>
+        d.Nom === nom ? { ...d, Type: type } : d // Met à jour le type de l'entreprise
+      )
+    );
+  };
+
+  // Fonction pour ajuster le rayon de recherche
+  const handleFilterRadiusChange = (radius: number) => {
+    setFilterRadius(radius);
   };
 
   return (
@@ -104,9 +131,10 @@ const App = () => {
         onCenter={handleCenterMap}
         onToggleVisibility={toggleVisibility}
         hiddenMarkers={hiddenMarkers}
-        onSetType={() => {}}
+        onSetType={handleSetType}
         onRemoveItem={removeItem}
-        onFilter={() => {}}
+        arborescence={arborescence} // Passer l'arborescence
+        onFilter={handleFilterRadiusChange} // Passez la fonction onFilter
       />
 
       <main className="map-container">
@@ -124,6 +152,8 @@ const App = () => {
           hiddenMarkers={hiddenMarkers}
           filterRadius={filterRadius}
           onFilter={setFilterRadius}
+          activeTab={activeTab} // Passer l'onglet actif à FloatingPanel
+          setActiveTab={setActiveTab} // Passer la fonction pour changer l'onglet
         />
         <Toaster position="top-center" />
       </main>

@@ -16,14 +16,17 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
   const [selectedNaf, setSelectedNaf] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Filtre les secteurs selon la recherche de l'utilisateur
   const filteredNaf = nafCodes.filter((n) =>
     n.label.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Mise à jour du secteur sélectionné
   const handleNafSelection = (id: string) => {
     setSelectedNaf(id);
   };
 
+  // Recherche du secteur et appel de l'API
   const handleSearch = async () => {
     if (!selectedNaf) {
       toast.error("❗ Sélectionnez un secteur d'activité !");
@@ -69,6 +72,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
     <div className="mb-4">
       <h3 className="text-lg font-bold mb-2">🎯 Filtrer par secteur d'activité</h3>
 
+      {/* Barre de recherche pour les secteurs */}
       <div className="relative mb-2">
         <FaSearch className="absolute left-3 top-3 text-gray-400" />
         <input
@@ -80,6 +84,7 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
         />
       </div>
 
+      {/* Sélecteur de secteur avec la liste filtrée */}
       {filteredNaf.length > 0 && (
         <select
           className="w-full border rounded p-2 mt-2"
@@ -95,8 +100,13 @@ const FiltreSecteurs: React.FC<Props> = ({ center, onSearchResults, radius }) =>
         </select>
       )}
 
-      <button onClick={handleSearch} disabled={loading} className="btn-search mt-4">
-        🔎 Lancer la recherche
+      {/* Bouton de recherche */}
+      <button
+        onClick={handleSearch}
+        disabled={loading}
+        className="btn-search mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition"
+      >
+        {loading ? "Recherche..." : "Lancer la recherche"}
       </button>
     </div>
   );
