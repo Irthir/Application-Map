@@ -8,6 +8,6 @@ export default defineConfig({
   // Ajoutez uniquement les variables nécessaires
   },
   build: {
-    chunkSizeWarningLimit: 1000, // Agmenter la limite à 1000 Ko
+    chunkSizeWarningLimit: 2000, // Agmenter la limite à 2000 Ko
   },
 });

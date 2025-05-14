@@ -5,17 +5,13 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #f8f9fa;  /* Fond plus clair pour correspondre à l'apparence souhaitée */
+  color: #1f2937;
+  background-color: #f8f9fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* Full height setup */
 html, body, #root {
@@ -24,36 +20,38 @@ html, body, #root {
   padding: 0;
 }
 
+/* Links */
 a {
   font-weight: 500;
   color: #007bff;
-  text-decoration: inherit;
+  text-decoration: none;
 }
 
 a:hover {
   color: #0056b3;
 }
 
-/* Main page layout */
+/* Main layout */
 .app-container {
   display: flex;
   height: 100%;
-  background-color: #f8f9fa;  /* Légère couleur de fond */
+  background-color: #f8f9fa;
 }
 
 /* Sidebar styling */
 .sidebar {
   width: 25%;
-  background-color: #1f2937; /* Dark gray */
+  background-color: #1f2937;
   color: white;
   padding: 20px;
   overflow-y: auto;
   border-right: 1px solid #444;
   transition: width 0.3s ease-in-out;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);  /* Ombre portée pour donner un effet de séparation */
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
 }
 
-.sidebar h1, .sidebar h2 {
+.sidebar h1,
+.sidebar h2 {
   color: #f9fafb;
 }
 
@@ -98,7 +96,7 @@ a:hover {
   height: 100%;
 }
 
-/* Floating Panel styles */
+/* Floating Panel */
 .floating-panel {
   background-color: rgba(0, 0, 0, 0.8);
   color: white;
@@ -109,11 +107,10 @@ a:hover {
   right: 5%;
   width: 70%;
   z-index: 10;
-  text-align: left;
   font-size: 14px;
   max-height: 250px;
   overflow-y: auto;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);  /* Ombre ajoutée pour donner plus de profondeur */
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
 }
 
 .floating-panel.hidden {
@@ -124,15 +121,11 @@ a:hover {
   position: absolute;
   top: -25px;
   right: 20px;
-  background-color: transparent;
+  background: none;
   border: none;
   color: white;
   font-size: 24px;
   cursor: pointer;
-}
-
-.floating-panel .toggle-btn:focus {
-  outline: none;
 }
 
 .floating-panel .tabs {
@@ -163,11 +156,6 @@ a:hover {
   border-bottom: 1px solid #eaeaea;
 }
 
-.floating-panel .search-icon {
-  margin-right: 5px;
-  color: #999;
-}
-
 .floating-panel .search-bar input {
   flex: 1;
   border: 2px solid #e2e8f0;
@@ -176,8 +164,6 @@ a:hover {
   font-size: 16px;
   background-color: white;
   color: #333;
-  outline: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .floating-panel .sector-filter {
@@ -187,7 +173,6 @@ a:hover {
   border-radius: 8px;
   background-color: white;
   color: #333;
-  outline: none;
   font-size: 14px;
   margin-top: 10px;
 }
@@ -202,8 +187,8 @@ a:hover {
   border-bottom: 1px solid #eaeaea;
   background-color: #2d3748;
   color: white;
-  position: relative;
   border-radius: 8px;
+  margin-bottom: 8px;
 }
 
 .floating-panel .panel-item:hover {
@@ -236,10 +221,6 @@ a:hover {
   cursor: pointer;
 }
 
-.floating-panel .action-btn:hover {
-  background-color: #e0e0e0;
-}
-
 .floating-panel .action-btn.remove {
   color: red;
 }
@@ -250,7 +231,6 @@ a:hover {
   color: #999;
 }
 
-/* Reveal button styles */
 .reveal-btn {
   position: fixed;
   bottom: 20px;
@@ -264,15 +244,11 @@ a:hover {
   z-index: 20;
 }
 
-.floating-panel.hidden + .reveal-btn {
-  display: block;
-}
-
 .reveal-btn:focus {
   outline: none;
 }
 
-/* Additional Styles for Responsiveness */
+/* Responsive */
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
@@ -283,12 +259,6 @@ a:hover {
     z-index: 20;
     padding: 10px;
   }
-
-  .map-container {
-    flex: 1;
-    height: 100%;
-  }
-
   .floating-panel {
     width: 90%;
     bottom: 10px;

@@ -6,154 +6,84 @@ import { DataPoint } from "./type";
 import { Toaster, toast } from "react-hot-toast";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-// Exemple de structure d'arborescence statique
+// Structure d'arborescence statique pour les filtres
 const arborescenceData = [
-  {
-    code: "01",
-    nom: "Culture et production animale",
-    activites: [
-      "Culture de céréales",
-      "Culture de légumes",
-      "Élevage de vaches laitières"
-    ]
-  },
-  {
-    code: "02",
-    nom: "Sylviculture et exploitation forestière",
-    activites: [
-      "Exploitation forestière",
-      "Récolte de produits forestiers"
-    ]
-  },
-  // Ajoutez plus de divisions et d'activités ici si nécessaire
+  { code: "01", nom: "Culture et production animale", activites: ["Culture de céréales", "Culture de légumes", "Élevage de vaches laitières"] },
+  { code: "02", nom: "Sylviculture et exploitation forestière", activites: ["Exploitation forestière", "Récolte de produits forestiers"] },
 ];
-
-const LOCAL_STORAGE_KEY = "application-map-data";
+const industries = arborescenceData.flatMap((d) => d.activites);
 
 const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
-  const [filterRadius, setFilterRadius] = useState<number>(5); // Rayon de recherche
+  const [filterRadius, setFilterRadius] = useState<number>(20);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
-  const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"Recherche" | "Clients" | "Prospects">("Recherche"); // Onglet actif
-  const [arborescence] = useState<any[]>(arborescenceData); // Structure des divisions et activités
 
-  // 🚀 Chargement des données depuis le cache local
+  // Chargement du cache
   useEffect(() => {
-    const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedData) {
+    const saved = localStorage.getItem("application-map-data");
+    if (saved) {
       try {
-        const parsedData = JSON.parse(savedData);
-        setData(parsedData);
-        toast.success("✅ Données récupérées depuis le cache");
-      } catch (error) {
-        console.error("❌ Erreur lors du chargement du cache :", error);
+        setData(JSON.parse(saved));
+      } catch {
+        console.error("Échec du parsing du cache");
       }
     }
   }, []);
 
-  // 💾 Mise à jour du cache lors de chaque modification
+  // Sauvegarde du cache
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem("application-map-data", JSON.stringify(data));
   }, [data]);
 
-  // 📥 Traitement des résultats de recherche
-  const handleSearchResults = useCallback((results: any[]) => {
-    const newEntries: DataPoint[] = results
-      .filter((r) => typeof r.Latitude === "number" && typeof r.Longitude === "number")
-      .map((r) => {
-        return {
-          Nom: r.Nom || "Entreprise",
-          Latitude: r.Latitude,
-          Longitude: r.Longitude,
-          Adresse: r.Adresse || r.adresse || "",
-          Secteur: r.Secteur || "Non spécifié",
-          CodeNAF: r.CodeNAF || "",
-          SIREN: r.SIREN || "",  // Assurez-vous d'inclure le SIREN
-          Type: "Recherche",  // Initialement type "Recherche"
-        };
+  // Recherche via API
+  const handleSearch = useCallback((query: string) => {
+    fetch(`/api/search?q=${encodeURIComponent(query)}`)
+      .then((res) => res.json())
+      .then((results: any[]) => {
+        const newPoints: DataPoint[] = results
+          .filter((r) => typeof r.Latitude === "number" && typeof r.Longitude === "number")
+          .map((r) => ({ Nom: r.Nom || "Entreprise", Latitude: r.Latitude, Longitude: r.Longitude, Adresse: r.Adresse || "", Secteur: r.Secteur || "Non spécifié", CodeNAF: r.CodeNAF || "", Type: "Prospect", Distance: typeof r.Distance === 'number' ? r.Distance : Number(r.Distance) || undefined }));
+        setData((prev) => [...prev, ...newPoints]);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error("Erreur lors de la recherche");
       });
-
-    setData((prev) => [...prev, ...newEntries]);
-    if (newEntries.length === 0) {
-      toast.error("❗ Aucun établissement trouvé.");
-    } else {
-      toast.success(`✅ ${newEntries.length} établissement(s) ajouté(s)`);
-    }
   }, []);
 
-  // 🗺️ Carte : centrage et filtres
-  const handleCenterMap = (lat: number, lon: number) => {
-    setMapCenter([lon, lat]);
-    setFilterRadius(5);
-  };
+  // Application des filtres
+  const handleFilter = useCallback(
+    (filters: { businessName: string; industry: string; employees: string; radius: number }) => {
+      setFilterRadius(filters.radius);
+      // TODO: filtrer les données en local si nécessaire
+    },
+    []
+  );
 
-  // Toggle de visibilité pour les markers
-  const toggleVisibility = (nom: string) => {
-    setHiddenMarkers((prev) =>
-      prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]
-    );
-  };
-
-  // Fonction pour supprimer un item
-  const removeItem = (nom: string) => {
-    setData((prev) => prev.filter((d) => d.Nom !== nom));
-  };
-
-  // Fonction pour mettre à jour le type d'une entreprise
-  const handleSetType = (nom: string, type: "Client" | "Prospect") => {
-    setData((prev) =>
-      prev.map((d) =>
-        d.Nom === nom ? { ...d, Type: type } : d // Met à jour le type de l'entreprise
-      )
-    );
-  };
-
-  // Fonction pour ajuster le rayon de recherche
-  const handleFilterRadiusChange = (radius: number) => {
-    setFilterRadius(radius);
+  // Centrer la carte
+  const handleCenterMap = (lat: number, lng: number) => {
+    setMapCenter([lng, lat]);
   };
 
   return (
     <div className="app-container">
       <Sidebar
-        data={data}
-        onUpload={setData}
-        onSearchResults={handleSearchResults}
-        mapCenter={mapCenter}
-        filterRadius={filterRadius}
-        setFilterRadius={setFilterRadius}
-        onClearRecherche={() => setData(data.filter((d) => d.Type !== "Recherche"))}
-        onClearCache={() => {
-          localStorage.removeItem(LOCAL_STORAGE_KEY);
-          setData([]);
-        }}
-        onCenter={handleCenterMap}
-        onToggleVisibility={toggleVisibility}
-        hiddenMarkers={hiddenMarkers}
-        onSetType={handleSetType}
-        onRemoveItem={removeItem}
-        arborescence={arborescence} // Passer l'arborescence
-        onFilter={handleFilterRadiusChange} // Passez la fonction onFilter
+        onSearch={handleSearch}
+        onFilter={handleFilter}
+        industries={industries}
       />
 
       <main className="map-container">
         <Map
           data={data}
-          center={mapCenter}
           filterRadius={filterRadius}
+          center={mapCenter}
           onClickSetCenter={handleCenterMap}
         />
         <FloatingPanel
           data={data}
-          onCenter={handleCenterMap}
-          onRemoveItem={removeItem}
-          onToggleVisibility={toggleVisibility}
-          hiddenMarkers={hiddenMarkers}
           filterRadius={filterRadius}
-          onFilter={setFilterRadius}
-          activeTab={activeTab} // Passer l'onglet actif à FloatingPanel
-          setActiveTab={setActiveTab} // Passer la fonction pour changer l'onglet
+          onCenter={handleCenterMap}
         />
         <Toaster position="top-center" />
       </main>

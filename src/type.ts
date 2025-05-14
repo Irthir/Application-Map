@@ -4,11 +4,12 @@ export interface DataPoint {
   Nom: string;
   Latitude: number;
   Longitude: number;
-  Adresse: string;
-  Secteur: string;
-  CodeNAF: string;
-  Type: string;
-  Distance?: string; // Optionnel
+  Adresse?: string;
+  Secteur?: string;
+  CodeNAF?: string;
+  SIREN?: string;
+  Type: 'Recherche' | 'Client' | 'Prospect';
+  Distance?: number;  // maintenant un nombre
 }
 
 export interface Coordinates {
@@ -16,14 +17,13 @@ export interface Coordinates {
   longitude: number;
 }
 
-// Pour une meilleure organisation des résultats retournés par BigQuery
 export interface BQCompanyData {
   Nom: string;
-  Secteur: string | boolean | null;  // Secteur peut être une chaîne, un booléen ou null
+  Secteur: string | boolean | null;
   Latitude: number;
   Longitude: number;
-  Adresse: string;
-  CodeNAF: string;
-  Type: "Recherche"; // Peut être personnalisé si nécessaire
-  Distance?: string;
+  Adresse?: string;
+  CodeNAF?: string;
+  Type: 'Recherche';
+  Distance?: number;
 }

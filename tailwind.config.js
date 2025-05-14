@@ -1,31 +1,28 @@
+// tailwind.config.js
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",  // Assurez-vous que tous les fichiers de contenu sont bien inclus
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
       colors: {
-        primary: '#007bff',  // Exemple de couleur primaire personnalisée
-        secondary: '#0056b3',  // Exemple de couleur secondaire
+        primary: '#007bff',
+        'primary-dark': '#0056b3',
+        'map-blue': '#3B82F6',
+        client: '#10B981',
+        prospect: '#F59E0B',
+        'dark-gray': '#1F2937',
+        'light-gray': '#E2E8F0',
       },
       fontFamily: {
-        sans: ['Helvetica', 'Arial', 'sans-serif'],  // Exemple d'ajout de police
-      },
-      spacing: {
-        '128': '32rem',  // Exemple d'ajout de taille personnalisée
+        sans: ['Helvetica', 'Arial', 'sans-serif'],
       },
     },
   },
   plugins: [
-    require('@tailwindcss/typography'),  // Ajout de plugin typographie si nécessaire
+    require('@tailwindcss/typography'),
   ],
-  purge: {
-    enabled: process.env.NODE_ENV === 'production',  // Activer la purge des classes inutilisées en production
-    content: [
-      "./index.html",
-      "./src/**/*.{js,ts,jsx,tsx}",
-    ],
-  },
 };

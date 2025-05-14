@@ -1,44 +1,46 @@
 import React, { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import * as turf from "@turf/turf";
+import "mapbox-gl/dist/mapbox-gl.css";
 
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_KEY || ""; // Assurez-vous que vous avez configuré votre token Mapbox
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_KEY || "";
 
 interface MapProps {
-  data: { Nom: string; Latitude: number; Longitude: number; Type: string; CodeNAF?: string }[];
-  filterRadius: number | null;
+  data: {
+    Nom: string;
+    Latitude: number;
+    Longitude: number;
+    Type: string;
+    Distance?: number | string;
+    CodeNAF?: string;
+  }[];
+  filterRadius: number;
   center: [number, number];
   onClickSetCenter: (lat: number, lng: number) => void;
 }
 
-const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCenter }) => {
+const Map: React.FC<MapProps> = ({ data, filterRadius, center, onClickSetCenter }) => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
 
+  // Initialisation de la carte
   useEffect(() => {
     if (!mapContainer.current) return;
 
-    // Initialisation de la carte Mapbox
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v11", // Style de carte
+      style: "mapbox://styles/mapbox/streets-v11",
       center,
       zoom: 12,
     });
 
-    // Gérer le clic sur la carte pour déplacer le centre de la carte
+    // Clic sur la carte pour recentrer
     map.current.on("click", (e) => {
-      if (!map.current) return;
-
-      const features = map.current.queryRenderedFeatures(e.point);
-      const clickedOnCircle = features.some(f => f.layer?.id === "search-radius-circle");
-      const popupOpen = document.querySelector(".mapboxgl-popup") !== null;
-
-      if (popupOpen || clickedOnCircle) return;
-
-      const { lng, lat } = e.lngLat;
-      onClickSetCenter(lat, lng);
+      const features = map.current?.queryRenderedFeatures(e.point) || [];
+      const clickedCircle = features.some((f) => f.layer?.id === "search-radius-circle");
+      if (clickedCircle) return;
+      onClickSetCenter(e.lngLat.lat, e.lngLat.lng);
     });
 
     return () => {
@@ -47,10 +49,9 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
     };
   }, []);
 
+  // Déplacement animé
   useEffect(() => {
-    if (!map.current || !center) return;
-
-    // Fly to new center position when the center is updated
+    if (!map.current) return;
     map.current.flyTo({
       center,
       zoom: 14,
@@ -58,79 +59,69 @@ const Map: React.FC<MapProps> = ({ data, filterRadius = 5, center, onClickSetCen
     });
   }, [center]);
 
+  // Marqueurs
   useEffect(() => {
     if (!map.current) return;
 
-    // Supprimer les anciens marqueurs
-    markersRef.current.forEach((marker) => marker.remove());
+    // Supprimer anciens
+    markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
-    // Ajouter des marqueurs pour chaque point de données
     data.forEach((item) => {
-      let color = "#9CA3AF"; // Couleur par défaut
-      if (item.Type === "Client") color = "#10B981"; // Vert pour les Clients
-      else if (item.Type === "Prospect") color = "#F59E0B"; // Jaune pour les Prospects
+      let color = "#6B7280";
+      if (item.Type === "Client") color = "#10B981";
+      else if (item.Type === "Prospect") color = "#F59E0B";
 
-      const safeNom = item.Nom.replace(/'/g, "\\'"); // Pour éviter les problèmes avec les guillemets simples
-      const safeNAF = item.CodeNAF ? item.CodeNAF.replace(/'/g, "\\'") : "";
-
-      const popupHTML = ` 
-        <div class="popup-content">
-          <strong>${item.Nom}</strong><br/>
-          Type: ${item.Type || "Non marqué"}<br/>
-          ${safeNAF ? `<button onclick="window.dispatchEvent(new CustomEvent('search-similar', { detail: { nom: '${safeNom}', naf: '${safeNAF}' } }))" class="mt-1 text-sm text-blue-600 underline">🔍 Entreprises similaires</button>` : ""}
-        </div>`;
+      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(
+        `<div class='p-2'>
+           <strong>${item.Nom}</strong><br/>
+           Type: ${item.Type}<br/>
+           ${item.CodeNAF ? `NAF: ${item.CodeNAF}` : ""}
+         </div>`
+      );
 
       const marker = new mapboxgl.Marker({ color })
         .setLngLat([item.Longitude, item.Latitude])
-        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML))
+        .setPopup(popup)
         .addTo(map.current!);
-
       markersRef.current.push(marker);
     });
   }, [data]);
 
+  // Cercle de filtre
   useEffect(() => {
-    if (!map.current || !center) return;
+    if (!map.current) return;
+    const id = "search-radius-circle";
 
-    const circleId = "search-radius-circle";
-
-    const addCircleLayer = () => {
-      if (map.current?.getLayer(circleId)) map.current.removeLayer(circleId);
-      if (map.current?.getSource(circleId)) map.current.removeSource(circleId);
-
-      // Créer un cercle géospatial autour du centre
-      const circle = turf.circle(center, filterRadius || 5, {
-        steps: 64,
-        units: "kilometers",
-      });
-
-      map.current!.addSource(circleId, {
-        type: "geojson",
-        data: circle,
-      });
-
-      map.current!.addLayer({
-        id: circleId,
-        type: "fill",
-        source: circleId,
-        layout: {},
-        paint: {
-          "fill-color": "#1D4ED8",
-          "fill-opacity": 0.2,
-        },
-      });
+    const drawCircle = () => {
+      const circle = turf.circle(center, filterRadius, { steps: 64, units: "kilometers" });
+      if (map.current!.getSource(id)) {
+        const source = map.current!.getSource(id) as mapboxgl.GeoJSONSource;
+        source.setData(circle);
+      } else {
+        map.current!
+          .addSource(id, { type: "geojson", data: circle })
+          .addLayer({
+            id,
+            type: "fill",
+            source: id,
+            paint: {
+              "fill-color": "#3B82F6",
+              "fill-opacity": 0.2,
+            },
+          });
+      }
     };
 
-    // Si le style de la carte est chargé, ajoutez le cercle
-    if (map.current.isStyleLoaded()) {
-      addCircleLayer();
-    } else {
-      map.current.once("style.load", addCircleLayer);
-    }
+    if (map.current.isStyleLoaded()) drawCircle();
+    else map.current.once("style.load", drawCircle);
   }, [center, filterRadius]);
 
-  return <div ref={mapContainer} className="mapbox-container" />;
+  return (
+    <div className="absolute inset-0">
+      <div ref={mapContainer} className="w-full h-full" />
+    </div>
+  );
 };
 
 export default Map;
