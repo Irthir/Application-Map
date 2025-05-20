@@ -1,117 +1,71 @@
-import { useState, useEffect, useCallback } from "react";
-import Sidebar from "./components/Sidebar";
-import Map from "./components/Map";
-import FloatingPanel from "./components/FloatingPanel";
-import { DataPoint } from "./type";
-import { Toaster, toast } from "react-hot-toast";
-import "mapbox-gl/dist/mapbox-gl.css";
+import React, { useState } from 'react';
+import Sidebar, { FilterValues } from './components/Sidebar';
+import Map from './components/Map';
+import FloatingPanel from './components/FloatingPanel';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { Entreprise, EntrepriseType } from './type.ts';
+import './index.css';
 
-// Structure d'arborescence statique pour les filtres
-const arborescenceData = [
-  { code: "01", nom: "Culture et production animale", activites: ["Culture de céréales", "Culture de légumes", "Élevage de vaches laitières"] },
-  { code: "02", nom: "Sylviculture et exploitation forestière", activites: ["Exploitation forestière", "Récolte de produits forestiers"] },
+const dummyEntreprises: Entreprise[] = [
+  {
+    type: EntrepriseType.Prospect,
+    name: 'Aubefeuille',
+    codeNAF: '41.20A',
+    siren: '123456789',
+    employeesCategory: '10-49',
+    address: '54 Rue Mazarine, Paris',
+    position: [2.3488, 48.8534],
+  },
+  {
+    type: EntrepriseType.Client,
+    name: 'Aube–Lo Jungle',
+    codeNAF: '62.01Z',
+    siren: '987654321',
+    employeesCategory: '50-99',
+    address: '5 Imp. des Acacias, Paris',
+    position: [2.3500, 48.8528],
+  },
+  {
+    type: EntrepriseType.Prospect,
+    name: 'Aube–Air',
+    codeNAF: '51.10Z',
+    siren: '192837465',
+    employeesCategory: '1-9',
+    address: '140 Av. Victor Hugo, Paris',
+    position: [2.3490, 48.8540],
+  },
 ];
-const industries = arborescenceData.flatMap((d) => d.activites);
 
-const App = () => {
-  const [data, setData] = useState<DataPoint[]>([]);
+const App: React.FC = () => {
+  const [entreprises, setEntreprises] = useState<Entreprise[]>(dummyEntreprises);
+  const [center, setCenter] = useState<[number, number]>(dummyEntreprises[0].position);
   const [filterRadius, setFilterRadius] = useState<number>(20);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
-  const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
 
-  // Chargement du cache
-  useEffect(() => {
-    const saved = localStorage.getItem("application-map-data");
-    if (saved) {
-      try {
-        setData(JSON.parse(saved));
-        toast.success("✅ Données récupérées depuis le cache");
-      } catch {
-        console.error("Échec du parsing du cache");
-      }
-    }
-  }, []);
+  const handleMapClick = (lat: number, lng: number) => setCenter([lng, lat]);
 
-  // Sauvegarde du cache
-  useEffect(() => {
-    localStorage.setItem("application-map-data", JSON.stringify(data));
-  }, [data]);
-
-  // Recherche via API
-  const handleSearch = useCallback((query: string) => {
-    fetch(`/api/search?q=${encodeURIComponent(query)}`)
-      .then((res) => res.json())
-      .then((results: any[]) => {
-        const newPoints: DataPoint[] = results
-          .filter((r) => typeof r.Latitude === "number" && typeof r.Longitude === "number")
-          .map((r) => ({
-            Nom: r.Nom || "Entreprise",
-            Latitude: r.Latitude,
-            Longitude: r.Longitude,
-            Adresse: r.Adresse || "",
-            Secteur: r.Secteur || "Non spécifié",
-            CodeNAF: r.CodeNAF || "",
-            Type: "Prospect",
-            Distance: typeof r.Distance === 'number' ? r.Distance : Number(r.Distance) || undefined,
-          }));
-        setData((prev) => [...prev, ...newPoints]);
-        toast.success(`✅ ${newPoints.length} point(s) ajouté(s)`);
-      })
-      .catch((err) => {
-        console.error(err);
-        toast.error("❌ Erreur lors de la recherche");
-      });
-  }, []);
-
-  // Application des filtres (mise à jour du rayon)
-  const handleFilter = useCallback(
-    (filters: { businessName: string; industry: string; employees: string; radius: number }) => {
-      setFilterRadius(filters.radius);
-    },
-    []
-  );
-
-  // Centrer la carte
-  const handleCenterMap = (lat: number, lng: number) => {
-    setMapCenter([lng, lat]);
-  };
-
-  // Supprimer un point
-  const removeItem = (nom: string) => {
-    setData((prev) => prev.filter((d) => d.Nom !== nom));
-  };
-
-  // Toggle visibilité marqueur
-  const toggleVisibility = (nom: string) => {
-    setHiddenMarkers((prev) =>
-      prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]
+  const handleApplyFilters = (filters: FilterValues) => {
+    const results = dummyEntreprises.filter(e =>
+      e.name.toLowerCase().includes(filters.name.toLowerCase())
     );
+    setEntreprises(results);
+    setFilterRadius(filters.radius);
+    toast.success('Filtres appliqués');
   };
 
   return (
-    <div className="app-container">
-      <Sidebar
-        onSearch={handleSearch}
-        onFilter={handleFilter}
-        industries={industries}
-      />
-
-      <main className="map-container">
+    <div className="app">
+      <Sidebar onApplyFilters={handleApplyFilters} />
+      <div className="main">
         <Map
-          data={data}
+          data={entreprises}
+          center={center}
           filterRadius={filterRadius}
-          center={mapCenter}
-          onClickSetCenter={handleCenterMap}
+          onClickSetCenter={handleMapClick}
         />
-        <FloatingPanel
-          data={data}
-          onCenter={handleCenterMap}
-          onRemoveItem={removeItem}
-          onToggleVisibility={toggleVisibility}
-          hiddenMarkers={hiddenMarkers}
-        />
-        <Toaster position="top-center" />
-      </main>
+        <FloatingPanel data={entreprises} />
+      </div>
+      <ToastContainer position="bottom-right" autoClose={3000} />
     </div>
   );
 };
