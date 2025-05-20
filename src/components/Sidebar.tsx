@@ -41,7 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onApplyFilters }) => {
 
   const handleApplyClick = () => {
     onApplyFilters({ name, industry, type, employees, radius });
-    toast.success('Filtres appliqués');
+    // toast.success('Filtres appliqués');
   };
 
   const employeeOptions = EmployeesCategoriesByType[type];
