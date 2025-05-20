@@ -17,6 +17,7 @@ const App = () => {
   const [data, setData] = useState<DataPoint[]>([]);
   const [filterRadius, setFilterRadius] = useState<number>(20);
   const [mapCenter, setMapCenter] = useState<[number, number]>([2.35, 48.85]);
+  const [hiddenMarkers, setHiddenMarkers] = useState<string[]>([]);
 
   // Chargement du cache
   useEffect(() => {
@@ -24,6 +25,7 @@ const App = () => {
     if (saved) {
       try {
         setData(JSON.parse(saved));
+        toast.success("✅ Données récupérées depuis le cache");
       } catch {
         console.error("Échec du parsing du cache");
       }
@@ -42,20 +44,29 @@ const App = () => {
       .then((results: any[]) => {
         const newPoints: DataPoint[] = results
           .filter((r) => typeof r.Latitude === "number" && typeof r.Longitude === "number")
-          .map((r) => ({ Nom: r.Nom || "Entreprise", Latitude: r.Latitude, Longitude: r.Longitude, Adresse: r.Adresse || "", Secteur: r.Secteur || "Non spécifié", CodeNAF: r.CodeNAF || "", Type: "Prospect", Distance: typeof r.Distance === 'number' ? r.Distance : Number(r.Distance) || undefined }));
+          .map((r) => ({
+            Nom: r.Nom || "Entreprise",
+            Latitude: r.Latitude,
+            Longitude: r.Longitude,
+            Adresse: r.Adresse || "",
+            Secteur: r.Secteur || "Non spécifié",
+            CodeNAF: r.CodeNAF || "",
+            Type: "Prospect",
+            Distance: typeof r.Distance === 'number' ? r.Distance : Number(r.Distance) || undefined,
+          }));
         setData((prev) => [...prev, ...newPoints]);
+        toast.success(`✅ ${newPoints.length} point(s) ajouté(s)`);
       })
       .catch((err) => {
         console.error(err);
-        toast.error("Erreur lors de la recherche");
+        toast.error("❌ Erreur lors de la recherche");
       });
   }, []);
 
-  // Application des filtres
+  // Application des filtres (mise à jour du rayon)
   const handleFilter = useCallback(
     (filters: { businessName: string; industry: string; employees: string; radius: number }) => {
       setFilterRadius(filters.radius);
-      // TODO: filtrer les données en local si nécessaire
     },
     []
   );
@@ -63,6 +74,18 @@ const App = () => {
   // Centrer la carte
   const handleCenterMap = (lat: number, lng: number) => {
     setMapCenter([lng, lat]);
+  };
+
+  // Supprimer un point
+  const removeItem = (nom: string) => {
+    setData((prev) => prev.filter((d) => d.Nom !== nom));
+  };
+
+  // Toggle visibilité marqueur
+  const toggleVisibility = (nom: string) => {
+    setHiddenMarkers((prev) =>
+      prev.includes(nom) ? prev.filter((n) => n !== nom) : [...prev, nom]
+    );
   };
 
   return (
@@ -82,8 +105,10 @@ const App = () => {
         />
         <FloatingPanel
           data={data}
-          filterRadius={filterRadius}
           onCenter={handleCenterMap}
+          onRemoveItem={removeItem}
+          onToggleVisibility={toggleVisibility}
+          hiddenMarkers={hiddenMarkers}
         />
         <Toaster position="top-center" />
       </main>

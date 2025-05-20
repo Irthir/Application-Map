@@ -117,11 +117,8 @@ const Map: React.FC<MapProps> = ({ data, filterRadius, center, onClickSetCenter 
     else map.current.once("style.load", drawCircle);
   }, [center, filterRadius]);
 
-  return (
-    <div className="absolute inset-0">
-      <div ref={mapContainer} className="w-full h-full" />
-    </div>
-  );
+  // Nouveau wrapper unique pour appliquer le CSS
+  return <div ref={mapContainer} className="mapbox-container" />;
 };
 
 export default Map;
