@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import Map from './components/Map';
 import FloatingPanel from './components/FloatingPanel';
 import Papa from 'papaparse';
-import { Entreprise, EntrepriseType } from './type.ts';
+import { Entreprise, EntrepriseType } from './type';
 import './index.css';
 
 const App: React.FC = () => {
@@ -15,7 +15,8 @@ const App: React.FC = () => {
 
   // Charger les données depuis le CSV nettoyé (public/Merged_SIRENE.csv)
   useEffect(() => {
-    fetch('/Merged_SIRENE.csv')
+    const csvPath = `${process.env.PUBLIC_URL || ''}/Merged_SIRENE.csv`;
+    fetch(csvPath)
       .then(res => {
         if (!res.ok) throw new Error(`Failed to load CSV: ${res.status}`);
         return res.text();
@@ -24,26 +25,28 @@ const App: React.FC = () => {
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
-          delimiter: ';', // Utiliser le bon séparateur
-          complete: (results) => {
-            const data: Entreprise[] = (results.data as any[]).map(row => {
-              const [lng, lat] = (row.position as string)
-                .replace(/\[|\]/g, '')
-                .split(',')
-                .map(Number);
-              return {
-                type: EntrepriseType.Recherche,
-                siren: row.siren,
-                name: row.name,
-                codeNAF: row.codeNAF,
-                employeesCategory: row.employeesCategory,
-                address: row.address,
-                position: [lng, lat] as [number, number],
-              };
-            });
-            setEntreprises(data);
-            if (data.length > 0) {
-              setCenter(data[0].position);
+          delimiter: ';',
+          complete: ({ data }) => {
+            const parsed: Entreprise[] = (data as any[])
+              .map(row => {
+                const [lng, lat] = (row.position as string)
+                  .replace(/\[|\]/g, '')
+                  .split(',')
+                  .map(Number);
+                return {
+                  type: EntrepriseType.Recherche,
+                  siren: row.siren,
+                  name: row.name,
+                  codeNAF: row.codeNAF,
+                  employeesCategory: row.employeesCategory,
+                  address: row.address,
+                  position: [lng, lat] as [number, number],
+                };
+              })
+              .filter(e => !!e.siren);
+            setEntreprises(parsed);
+            if (parsed.length > 0) {
+              setCenter(parsed[0].position);
             }
           }
         });

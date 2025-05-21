@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import React, { useState, useMemo } from 'react';
-import { Entreprise } from '../type.ts';
+import { Entreprise } from '../type';
 
 interface SidebarProps {
   data: Entreprise[];
@@ -37,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ data, onSelectEntreprise }) => {
         value={searchTerm}
         onChange={e => setSearchTerm(e.target.value)}
       />
+      
       {suggestions.length > 0 ? (
         <ul className="suggestions">
           {suggestions.map((e, idx) => (
@@ -52,6 +53,36 @@ const Sidebar: React.FC<SidebarProps> = ({ data, onSelectEntreprise }) => {
           </div>
         )
       )}
+
+      {/* 
+        Contrôles de filtre (désactivés pour le moment)
+      */}
+      <div className="filters">
+        <h2>Filtrer les résultats</h2>
+        <div className="filter-group">
+          <label>Type</label>
+          <select>
+            <option>Prospect</option>
+            <option>Client</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>Effectifs</label>
+          <select>
+            <option>1-9</option>
+            <option>10-49</option>
+            <option>50-99</option>
+            <option>100+</option>
+          </select>
+        </div>
+        <div className="slider-group">
+          <span>Rayon</span>
+          <input type="range" min="1" max="50" />
+          <span>22 km</span>
+        </div>
+        <button className="btn-primary">Appliquer les filtres</button>
+      </div>
+
     </aside>
   );
 };
