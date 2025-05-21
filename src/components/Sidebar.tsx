@@ -17,8 +17,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
       return;
     }
     setLoading(true);
-    fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
-      .then(res => res.json())
+    fetch(`https://application-map.onrender.com/api/search?term=${encodeURIComponent(searchTerm)}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data: Entreprise[]) => setSuggestions(data))
       .catch(err => {
         console.error('Erreur fetch suggestions', err);
@@ -45,8 +48,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
       {loading && <div className="loading">Chargement...</div>}
       {suggestions.length > 0 && (
         <ul className="suggestions">
-          {suggestions.map((e, i) => (
-            <li key={i} onClick={() => handleSelect(e)}>
+          {suggestions.map((e, idx) => (
+            <li key={idx} onClick={() => handleSelect(e)}>
               {e.name} — {e.siren} — {e.address}
             </li>
           ))}
@@ -54,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
       )}
 
       {/*
-        Ces contrôles sont commentés pour l'instant :
+        Controles de filtre désactivés pour l'instant :
         <h2>Filtrer les résultats</h2>
         <div className="filter-group">
           <label>Type</label>
@@ -77,7 +80,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
         <button className="btn-primary">Appliquer les filtres</button>
       */}
     </aside>
-);
+  );
 };
 
 export default Sidebar;
