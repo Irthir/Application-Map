@@ -1,4 +1,3 @@
-// server.js (ES module) without axios, using native fetch
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -13,6 +12,7 @@ app.use(express.json());
 const INSEE_API_KEY = process.env.INSEE_API_KEY;
 if (!INSEE_API_KEY) console.warn('⚠️ INSEE_API_KEY non défini dans .env');
 
+// Endpoint de recherche d'entreprises
 // GET /api/search?term=...
 app.get('/api/search', async (req, res) => {
   const term = req.query.term;
@@ -50,7 +50,10 @@ app.get('/api/search', async (req, res) => {
         address: [geo.numeroVoieEtablissement, geo.typeVoieEtablissement, geo.libelleVoieEtablissement]
           .filter(Boolean).join(' ') +
           `, ${geo.codePostalEtablissement || ''} ${geo.libelleCommuneEtablissement || ''}`.trim(),
-        position: [parseFloat(u.longitudeUniteLegale) || 0, parseFloat(u.latitudeUniteLegale) || 0],
+        position: [
+          parseFloat(u.longitudeUniteLegale) || 0,
+          parseFloat(u.latitudeUniteLegale)  || 0
+        ],
         type: 'Recherche'
       };
     });
