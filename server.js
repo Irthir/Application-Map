@@ -6,7 +6,10 @@ import cors from 'cors';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Activer CORS pour toutes les origines
+app.use(cors({ origin: '*' }));
+// Gérer les prévol CORS
+app.options('*', cors({ origin: '*' }));
 app.use(express.json());
 
 const INSEE_API_KEY = process.env.INSEE_API_KEY;
