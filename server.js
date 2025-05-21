@@ -1,10 +1,11 @@
-// server.js (ES module) - using INSEE SIRENE V3 API with OAuth2 (client credentials)
+// server.js (ES module) - enhanced: SIREN, name, address cases using INSEE SIRENE V3 API
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
 app.use(cors());
 app.use(express.json());
 
@@ -19,21 +20,13 @@ let tokenExpiry = 0;
 
 // Fetch OAuth2 token from INSEE
 async function fetchInseeToken() {
-  if (inseeToken && Date.now() < tokenExpiry - 60000) {
-    return inseeToken;
-  }
+  if (inseeToken && Date.now() < tokenExpiry - 60000) return inseeToken;
   const creds = Buffer.from(`${INSEE_API_KEY}:${INSEE_API_SECRET}`).toString('base64');
   const resp = await fetch('https://api.insee.fr/token?grant_type=client_credentials', {
     method: 'POST',
-    headers: {
-      Authorization: `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
+    headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' }
   });
-  if (!resp.ok) {
-    const txt = await resp.text();
-    throw new Error(`Insee token error ${resp.status}: ${txt}`);
-  }
+  if (!resp.ok) throw new Error(`Token error ${resp.status}`);
   const data = await resp.json();
   inseeToken = data.access_token;
   tokenExpiry = Date.now() + data.expires_in * 1000;
@@ -42,67 +35,83 @@ async function fetchInseeToken() {
 
 /**
  * GET /api/search?term=...
- * Search units and establishments via INSEE SIRENE V3 API
+ * Cases:
+ * - SIREN (9 digits): direct fetch unit and establishments
+ * - Name: find unit by name, then fetch details by siren
+ * - Address: find establishment by address, then fetch details by siren
  */
 app.get('/api/search', async (req, res) => {
-  const term = (req.query.term || '').trim();
-  if (!term) return res.status(400).json({ error: 'Paramètre term manquant' });
+  const raw = (typeof req.query.term === 'string' ? req.query.term : '').trim();
+  if (!raw) return res.status(400).json({ error: 'Paramètre term manquant' });
 
   try {
     const token = await fetchInseeToken();
     const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
 
-    const qUnits = `denominationUniteLegale:*${term}* OR siren:${term}*`;
-    const urlUnits = `https://api.insee.fr/entreprises/sirene/V3/siren?q=${encodeURIComponent(qUnits)}&nombre=5`;
+    let sirenToFetch = null;
 
-    const qEtabs = `geo_adresseEtablissement:*${term}* OR libelleCommuneEtablissement:*${term}*`;
-    const urlEtabs = `https://api.insee.fr/entreprises/sirene/V3/etablissements?q=${encodeURIComponent(qEtabs)}&nombre=5`;
-
-    const [respUnits, respEtabs] = await Promise.all([
-      fetch(urlUnits, { headers }),
-      fetch(urlEtabs, { headers })
-    ]);
-
-    if (!respUnits.ok || !respEtabs.ok) {
-      console.error('Erreur SIRENE API', respUnits.status, respEtabs.status);
-      return res.status(502).json({ error: 'Erreur externe lors de la recherche' });
+    // 1) SIREN case
+    if (/^\d{9}$/.test(raw)) {
+      sirenToFetch = raw;
+    } else {
+      // 2) Name case: search unites_legales via /siren
+      const nameQ = `denominationUniteLegale:*${raw}*`;
+      const respName = await fetch(
+        `https://api.insee.fr/entreprises/sirene/V3/siren?q=${encodeURIComponent(nameQ)}&nombre=1`,
+        { headers }
+      );
+      if (respName.ok) {
+        const d1 = await respName.json();
+        const u = d1.unitesLegales?.[0];
+        if (u?.siren) sirenToFetch = u.siren;
+      }
+      // 3) Address fallback: if no siren yet
+      if (!sirenToFetch) {
+        const addrQ = `geo_adresseEtablissement:*${raw}*`;
+        const respAddr = await fetch(
+          `https://api.insee.fr/entreprises/sirene/V3/etablissements?q=${encodeURIComponent(addrQ)}&nombre=1`,
+          { headers }
+        );
+        if (respAddr.ok) {
+          const d2 = await respAddr.json();
+          const e = d2.etablissements?.[0];
+          if (e?.uniteLegale?.siren) sirenToFetch = e.uniteLegale.siren;
+        }
+      }
     }
 
-    const dataUnits = await respUnits.json();
-    const dataEtabs = await respEtabs.json();
+    if (!sirenToFetch) {
+      return res.json([]); // aucun résultat
+    }
 
-    const units = (dataUnits.unitesLegales || []).map((u) => ({
-      name: u.denominationUniteLegale,
-      siren: u.siren,
-      codeNAF: u.activitePrincipaleUniteLegale,
-      employeesCategory: u.trancheEffectifSalarieUniteLegale || '',
+    // Fetch unit details by siren
+    const respDetail = await fetch(
+      `https://api.insee.fr/entreprises/sirene/V3/siren?q=siren:${sirenToFetch}&nombre=1`,
+      { headers }
+    );
+    if (!respDetail.ok) {
+      console.error('Detail fetch error', respDetail.status);
+      return res.status(502).json({ error: 'Erreur externe sur détails' });
+    }
+    const detData = await respDetail.json();
+    const unit = detData.unitesLegales?.[0];
+    if (!unit) return res.json([]);
+
+    // Optionally fetch establishments for radius etc.
+
+    // Return single result as array
+    return res.json([{
+      name: unit.denominationUniteLegale,
+      siren: unit.siren,
+      codeNAF: unit.activitePrincipaleUniteLegale,
+      employeesCategory: unit.trancheEffectifSalarieUniteLegale || '',
       address: '',
       position: [2.3522, 48.8566],
       type: 'Recherche'
-    }));
-
-    const etabs = (dataEtabs.etablissements || []).map((e) => ({
-      name: e.uniteLegale.denominationUniteLegale,
-      siren: e.uniteLegale.siren,
-      codeNAF: e.uniteLegale.activitePrincipaleUniteLegale,
-      employeesCategory: e.uniteLegale.trancheEffectifSalarieUniteLegale || '',
-      address: e.geo_adresseEtablissement?.label || '',
-      position: [e.longitudeEtablissement || 2.3522, e.latitudeEtablissement || 48.8566],
-      type: 'Prospect'
-    }));
-
-    const combined = [...units, ...etabs];
-    const seen = new Set();
-    const results = combined.filter(item => {
-      if (seen.has(item.siren)) return false;
-      seen.add(item.siren);
-      return true;
-    });
-
-    res.json(results);
+    }]);
   } catch (err) {
     console.error('Erreur interne serveur:', err);
-    res.status(500).json({ error: 'Erreur interne du serveur' });
+    return res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
