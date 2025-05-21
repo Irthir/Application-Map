@@ -1,8 +1,8 @@
-// server.js
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
+// server.js (ES module syntax)
+import 'dotenv/config';
+import express from 'express';
+import axios from 'axios';
+import cors from 'cors';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -17,15 +17,22 @@ if (!INSEE_API_KEY) {
 }
 
 // Endpoint de recherche d'entreprises
-// GET /api/search?term=...   
+// GET /api/search?term=...
 app.get('/api/search', async (req, res) => {
   const term = req.query.term;
-  if (!term) return res.status(400).json({ error: 'Paramètre term manquant' });
+  if (typeof term !== 'string' || !term.trim()) {
+    return res.status(400).json({ error: 'Paramètre term manquant' });
+  }
 
   try {
     // Recherche via l'API Sirene V3
-    const url = `https://api.insee.fr/entreprises/sirene/V3/siren?q=denominationUniteLegale:*${encodeURIComponent(term)}* OR siren:${encodeURIComponent(term)}*&nombre=10`;
+    const url = `https://api.insee.fr/entreprises/sirene/V3/siren`;
+    const params = {
+      q: `denominationUniteLegale:*${term}* OR siren:${term}*`,
+      nombre: 10
+    };
     const response = await axios.get(url, {
+      params,
       headers: {
         Authorization: `Bearer ${INSEE_API_KEY}`,
         Accept: 'application/json'
@@ -40,7 +47,12 @@ app.get('/api/search', async (req, res) => {
         siren: u.siren,
         codeNAF: u.activitePrincipaleUniteLegale,
         employeesCategory: u.trancheEffectifsUniteLegale || 'Non renseigné',
-        address: `${geo.numeroVoieEtablissement || ''} ${geo.typeVoieEtablissement || ''} ${geo.libelleVoieEtablissement || ''}, ${geo.codePostalEtablissement || ''} ${geo.libelleCommuneEtablissement || ''}`.trim(),
+        address: [
+          geo.numeroVoieEtablissement,
+          geo.typeVoieEtablissement,
+          geo.libelleVoieEtablissement
+        ].filter(Boolean).join(' ') +
+        `, ${geo.codePostalEtablissement || ''} ${geo.libelleCommuneEtablissement || ''}`.trim(),
         position: [
           parseFloat(u.longitudeUniteLegale) || 0,
           parseFloat(u.latitudeUniteLegale)  || 0
@@ -52,7 +64,7 @@ app.get('/api/search', async (req, res) => {
     res.json(results);
   } catch (err) {
     console.error('Erreur API INSEE', err.response?.data || err.message);
-    res.status(500).json({ error: 'Erreur lors de la recherche d\'entreprises' });
+    res.status(500).json({ error: "Erreur lors de la recherche d'entreprises" });
   }
 });
 
