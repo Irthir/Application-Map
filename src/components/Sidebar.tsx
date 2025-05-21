@@ -57,7 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
       )}
 
       {/*
-        Controles de filtre désactivés pour l'instant :
+        Contrôles de filtre désactivés pour l'instant :
         <h2>Filtrer les résultats</h2>
         <div className="filter-group">
           <label>Type</label>
