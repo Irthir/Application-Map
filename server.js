@@ -1,7 +1,6 @@
-// server.js (ES module)
+// server.js (ES module) without axios, using native fetch
 import 'dotenv/config';
 import express from 'express';
-import axios from 'axios';
 import cors from 'cors';
 
 const app = express();
@@ -21,12 +20,25 @@ app.get('/api/search', async (req, res) => {
     return res.status(400).json({ error: 'Paramètre term manquant' });
   }
   try {
-    const url = 'https://api.insee.fr/entreprises/sirene/V3/siren';
-    const params = { q: `denominationUniteLegale:*${term}* OR siren:${term}*`, nombre: 10 };
-    const { data } = await axios.get(url, {
-      params,
-      headers: { Authorization: `Bearer ${INSEE_API_KEY}`, Accept: 'application/json' }
+    const baseUrl = 'https://api.insee.fr/entreprises/sirene/V3/siren';
+    const params = new URLSearchParams({
+      q: `denominationUniteLegale:*${term}* OR siren:${term}*`,
+      nombre: '10'
     });
+    const url = `${baseUrl}?${params.toString()}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${INSEE_API_KEY}`,
+        Accept: 'application/json'
+      }
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('Erreur INSEE fetch:', response.status, text);
+      return res.status(500).json({ error: "Erreur externe lors de la recherche" });
+    }
+    const data = await response.json();
     const etabs = data.unitesLegales || [];
     const results = etabs.map(u => {
       const geo = u.geo_adresse || {};
@@ -36,15 +48,16 @@ app.get('/api/search', async (req, res) => {
         codeNAF: u.activitePrincipaleUniteLegale,
         employeesCategory: u.trancheEffectifsUniteLegale || 'Non renseigné',
         address: [geo.numeroVoieEtablissement, geo.typeVoieEtablissement, geo.libelleVoieEtablissement]
-          .filter(Boolean).join(' ') + `, ${geo.codePostalEtablissement || ''} ${geo.libelleCommuneEtablissement || ''}`.trim(),
+          .filter(Boolean).join(' ') +
+          `, ${geo.codePostalEtablissement || ''} ${geo.libelleCommuneEtablissement || ''}`.trim(),
         position: [parseFloat(u.longitudeUniteLegale) || 0, parseFloat(u.latitudeUniteLegale) || 0],
         type: 'Recherche'
       };
     });
     res.json(results);
   } catch (err) {
-    console.error('Erreur API INSEE', err);
-    res.status(500).json({ error: "Erreur lors de la recherche d'entreprises" });
+    console.error('Erreur sur le serveur:', err);
+    res.status(500).json({ error: "Erreur interne du serveur" });
   }
 });
 
