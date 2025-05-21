@@ -53,7 +53,7 @@ app.get('/api/search', async (req, res) => {
     const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
 
     const qUnits = `denominationUniteLegale:*${term}* OR siren:${term}*`;
-    const urlUnits = `https://api.insee.fr/entreprises/sirene/V3/unites_legales?q=${encodeURIComponent(qUnits)}&nombre=5`;
+    const urlUnits = `https://api.insee.fr/entreprises/sirene/V3/siren?q=${encodeURIComponent(qUnits)}&nombre=5`;
 
     const qEtabs = `geo_adresseEtablissement:*${term}* OR libelleCommuneEtablissement:*${term}*`;
     const urlEtabs = `https://api.insee.fr/entreprises/sirene/V3/etablissements?q=${encodeURIComponent(qEtabs)}&nombre=5`;
