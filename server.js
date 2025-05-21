@@ -1,4 +1,4 @@
-// server.js (ES module) - using entreprise.api.gouv.fr Public API
+// server.js (ES module) - switch to OpenCorporates API for company search
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -11,37 +11,37 @@ app.use(express.json());
 
 /**
  * GET /api/search?term=...
- * Searches companies by name/SIREN/address via entreprise.api.gouv.fr Public API
+ * Uses OpenCorporates public API to search French companies by name/SIREN/address
  */
 app.get('/api/search', async (req, res) => {
-  const term = String(req.query.term || '').trim();
+  const term = (req.query.term || '').trim();
   if (!term) {
     return res.status(400).json({ error: 'Paramètre term manquant' });
   }
 
   try {
-    // Query the public API: returns up to 5 results
-    const apiUrl = `https://entreprise.api.gouv.fr/v3/search?query=${encodeURIComponent(term)}&per_page=5`;
-    const response = await fetch(apiUrl);
+    // Query OpenCorporates: search up to 5 companies in France
+    const url = `https://api.opencorporates.com/v0.4/companies/search?jurisdiction_code=fr&q=${encodeURIComponent(term)}&per_page=5`;
+    const response = await fetch(url);
     if (!response.ok) {
-      const txt = await response.text();
-      console.error('Erreur API gov.fr', response.status, txt);
+      const text = await response.text();
+      console.error('Erreur OpenCorporates', response.status, text);
       return res.status(502).json({ error: 'Erreur externe lors de la recherche' });
     }
     const data = await response.json();
+    const companies = data.results.companies || [];
 
-    // Map into uniform structure
-    const results = (data.searchResults || []).map((item) => {
-      const unite = item.uniteLegale;
-      const etab = item.etablissement;
+    // Map results
+    const results = companies.map((c) => {
+      const comp = c.company;
       return {
-        name: unite?.denominationUniteLegale || 'N/A',
-        siren: unite?.siren || '',
-        codeNAF: unite?.activitePrincipaleUniteLegale || '',
-        employeesCategory: unite?.trancheEffectifsUniteLegale || 'Non renseigné',
-        address: etab?.geo_adresse?.label || unite?.adresseEtablissement?.label || '',
-        position: etab?.geo_adresse?.coordinates || [2.3522, 48.8566],
-        type: 'Recherche',
+        name: comp.name || 'N/A',
+        siren: comp.company_number || '',
+        codeNAF: comp.industry_codes && comp.industry_codes.length ? comp.industry_codes[0].code : '',
+        employeesCategory: comp.employee_range || '',
+        address: comp.registered_address_in_full || '',
+        position: [2.3522, 48.8566], // OpenCorporates doesn't provide geolocation, fallback to Paris
+        type: 'Recherche'
       };
     });
 
@@ -52,4 +52,4 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Serveur démarré sur le port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Serveur démarré sur le port ${PORT}`));(PORT, () => console.log(`🚀 Serveur démarré sur le port ${PORT}`));
