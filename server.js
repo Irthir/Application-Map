@@ -1,220 +1,61 @@
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
-import dotenv from "dotenv";
-import fs from "fs";
-import { LambertToWGS84 } from "./utils/lambertToWGS84.js";
-import { BigQuery } from "@google-cloud/bigquery";
+// server.js
+require('dotenv').config();
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
 
-// Charger les variables d'environnement
-dotenv.config();
-
-// Vérification des clés API
-if (!process.env.VITE_MAPBOX_KEY || !process.env.GOOGLE_CLOUD_CREDENTIALS) {
-  console.error("Les clés API sont manquantes");
-  process.exit(1);  // Arrêter l'application si une clé est manquante
-}
-
-// Initialiser l'application Express
 const app = express();
+const PORT = process.env.PORT || 4000;
 
-// Autorisations CORS
-const allowedOrigins = ["https://irthir.github.io", "http://localhost:5173"];
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    }
-  })
-);
+app.use(cors());
 app.use(express.json());
 
-// Lecture des données de codes postaux (fichier local)
-const codePostalData = JSON.parse(fs.readFileSync("./src/data/code-postaux.json", "utf-8"));
+// Clé API INSEE (à définir dans .env)
+const INSEE_API_KEY = process.env.INSEE_API_KEY;
+if (!INSEE_API_KEY) {
+  console.warn('⚠️  INSEE_API_KEY non défini dans .env');
+}
 
-// Connexion à BigQuery
-const bigquery = new BigQuery({
-  credentials: JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS || '{}'),
-  projectId: "application-map-458717"
-});
+// Endpoint de recherche d'entreprises
+// GET /api/search?term=...   
+app.get('/api/search', async (req, res) => {
+  const term = req.query.term;
+  if (!term) return res.status(400).json({ error: 'Paramètre term manquant' });
 
-// Fonction de calcul de distance (Haversine)
-const haversineDistance = (lat1, lon1, lat2, lon2) => {
-  const toRad = (x) => (x * Math.PI) / 180;
-  const R = 6371; // Rayon de la Terre en kilomètres
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
-// Fonction d'enrichissement des données via l'API INSEE
-const enrichDataWithINSEE = async (siren) => {
   try {
-    const response = await fetch(`https://api.insee.fr/entreprises/sirene/V3/siren/${siren}`, {
-      method: "GET",
+    // Recherche via l'API Sirene V3
+    const url = `https://api.insee.fr/entreprises/sirene/V3/siren?q=denominationUniteLegale:*${encodeURIComponent(term)}* OR siren:${encodeURIComponent(term)}*&nombre=10`;
+    const response = await axios.get(url, {
       headers: {
-        "Authorization": `Bearer ${process.env.INSEE_API_KEY}`,
-      },
+        Authorization: `Bearer ${INSEE_API_KEY}`,
+        Accept: 'application/json'
+      }
     });
 
-    if (!response.ok) {
-      console.error(`Erreur API INSEE pour le SIREN: ${siren}`);
-      return null;
-    }
+    const etabs = response.data.unitesLegales || [];
+    const results = etabs.map(u => {
+      const geo = u.geo_adresse || {};
+      return {
+        name: u.denominationUniteLegale,
+        siren: u.siren,
+        codeNAF: u.activitePrincipaleUniteLegale,
+        employeesCategory: u.trancheEffectifsUniteLegale || 'Non renseigné',
+        address: `${geo.numeroVoieEtablissement || ''} ${geo.typeVoieEtablissement || ''} ${geo.libelleVoieEtablissement || ''}, ${geo.codePostalEtablissement || ''} ${geo.libelleCommuneEtablissement || ''}`.trim(),
+        position: [
+          parseFloat(u.longitudeUniteLegale) || 0,
+          parseFloat(u.latitudeUniteLegale)  || 0
+        ],
+        type: 'Recherche'
+      };
+    });
 
-    const data = await response.json();
-    return {
-      Nom: data.entreprise.denominationUsuelleEtablissement || "Inconnu",
-      Secteur: data.entreprise.activitePrincipaleEtablissement || "Non spécifié",
-      Adresse: `${data.entreprise.codePostalEtablissement} ${data.entreprise.libelleCommuneEtablissement}`,
-    };
+    res.json(results);
   } catch (err) {
-    console.error("Erreur lors de l'appel à l'API INSEE :", err);
-    return null;
-  }
-};
-
-// Gestion des erreurs API
-const handleApiError = (err, res) => {
-  console.error("Erreur serveur:", err.message);
-  res.status(500).json({ error: "Erreur interne du serveur" });
-};
-
-// 🔍 Recherche par activité (depuis BigQuery)
-app.get("/api/bigquery-activite", async (req, res) => {
-  const { naf, lat, lng, radius } = req.query;
-
-  if (!naf || !lat || !lng || !radius) {
-    return res.status(400).json({ error: "Paramètres 'naf', 'lat', 'lng', 'radius' requis." });
-  }
-
-  const latNum = parseFloat(lat);
-  const lngNum = parseFloat(lng);
-  const radiusNum = parseFloat(radius);
-
-  try {
-    const query = `
-      SELECT
-        denominationUsuelleEtablissement AS Nom,
-        activitePrincipaleEtablissement AS CodeNAF,
-        coordonneeLambertAbscisseEtablissement AS x,
-        coordonneeLambertOrdonneeEtablissement AS y,
-        codePostalEtablissement,
-        libelleCommuneEtablissement,
-        siren
-      FROM \`application-map-458717.sirene_data.etablissements\`
-      WHERE activitePrincipaleEtablissement = @naf
-      LIMIT 3000
-    `;
-
-    const options = {
-      query,
-      params: { naf },
-      location: "EU",
-    };
-
-    const [rows] = await bigquery.query(options);
-
-    const results = await Promise.all(
-      rows.map(async (row) => {
-        const lambertX = parseFloat(row.x);
-        const lambertY = parseFloat(row.y);
-        if (isNaN(lambertX) || isNaN(lambertY)) return null;
-
-        const [latitude, longitude] = LambertToWGS84(lambertX, lambertY);
-        const distance = haversineDistance(latNum, lngNum, latitude, longitude);
-        if (isNaN(distance) || distance > radiusNum) return null;
-
-        const enrichedData = await enrichDataWithINSEE(row.siren);
-
-        return {
-          Nom: enrichedData?.Nom || row.denominationUsuelleEtablissement || "Entreprise",
-          Latitude: latitude,
-          Longitude: longitude,
-          Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
-          CodeNAF: row.activitePrincipaleEtablissement,
-          Type: "Recherche",
-          Distance: distance.toFixed(2),
-          Secteur: enrichedData?.Secteur || "Non spécifié",
-        };
-      })
-    );
-
-    res.json(results.filter(Boolean));
-  } catch (error) {
-    handleApiError(error, res);
+    console.error('Erreur API INSEE', err.response?.data || err.message);
+    res.status(500).json({ error: 'Erreur lors de la recherche d\'entreprises' });
   }
 });
 
-// 🔍 Recherche par SIREN (depuis BigQuery)
-app.get("/api/bigquery/:siren", async (req, res) => {
-  const { siren } = req.params;
-
-  if (!siren || !/^\d{9}$/.test(siren)) {
-    return res.status(400).json({ error: "SIREN invalide" });
-  }
-
-  try {
-    const query = `
-      SELECT
-        denominationUsuelleEtablissement AS Nom,
-        activitePrincipaleEtablissement AS CodeNAF,
-        coordonneeLambertAbscisseEtablissement AS x,
-        coordonneeLambertOrdonneeEtablissement AS y,
-        codePostalEtablissement,
-        libelleCommuneEtablissement
-      FROM \`application-map-458717.sirene_data.etablissements\`
-      WHERE siren = @siren
-      LIMIT 1
-    `;
-
-    const options = {
-      query,
-      params: { siren },
-      location: "EU",
-    };
-
-    const [rows] = await bigquery.query(options);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: "Entreprise non trouvée dans BigQuery" });
-    }
-
-    const row = rows[0];
-    const lambertX = parseFloat(row.x);
-    const lambertY = parseFloat(row.y);
-
-    if (isNaN(lambertX) || isNaN(lambertY)) {
-      return res.status(400).json({ error: "Coordonnées manquantes" });
-    }
-
-    const [latitude, longitude] = LambertToWGS84(lambertX, lambertY);
-
-    const enrichedData = await enrichDataWithINSEE(row.siren);
-
-    res.json([{
-      Nom: enrichedData?.Nom || row.denominationUsuelleEtablissement || "Entreprise",
-      Latitude: latitude,
-      Longitude: longitude,
-      Adresse: `${row.codePostalEtablissement || ""} ${row.libelleCommuneEtablissement || ""}`.trim(),
-      CodeNAF: row.activitePrincipaleEtablissement,
-      Type: "Recherche",
-      Secteur: enrichedData?.Secteur || "Non spécifié",
-    }]);
-  } catch (error) {
-    handleApiError(error, res);
-  }
+app.listen(PORT, () => {
+  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
 });
-
-// Vérification du bon fonctionnement du serveur
-app.get("/ping", (req, res) => {
-  res.send("pong 🏓");
-});
-
-// Démarrage du serveur
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Serveur API en ligne sur http://localhost:${PORT}`));

@@ -82,3 +82,27 @@ body { font-family: var(--font-family); color: #111827; }
   color: var(--color-gray-dark); font-size: 14px;
 }
 .list-item .industry { font-style: italic; }
+
+.suggestions {
+  position: absolute;
+  top: 44px;
+  left: 24px;
+  right: 24px;
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+.suggestions li {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.suggestions li:hover {
+  background: #F3F4F6;
+}
+aside.sidebar { position: relative; }

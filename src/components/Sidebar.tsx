@@ -1,120 +1,83 @@
+// src/components/Sidebar.tsx
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import { EntrepriseType, EmployeesCategory, EmployeesCategoriesByType } from '../type.ts';
-
-export interface FilterValues {
-  name: string;
-  industry: string;
-  type: EntrepriseType;
-  employees: EmployeesCategory;
-  radius: number;
-}
+import { Entreprise } from '../type.ts';
 
 interface SidebarProps {
-  onApplyFilters: (filters: FilterValues) => void;
+  onSelectEntreprise: (e: Entreprise) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ onApplyFilters }) => {
-  const [name, setName] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [type, setType] = useState<EntrepriseType>(EntrepriseType.Recherche);
-  const [employees, setEmployees] = useState<EmployeesCategory>(EmployeesCategoriesByType[type][0]);
-  const [radius, setRadius] = useState(20);
+const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Mettre à jour la liste des employés quand le type change
   useEffect(() => {
-    const allowed = EmployeesCategoriesByType[type];
-    if (!allowed.includes(employees)) {
-      setEmployees(allowed[0]);
+    if (!searchTerm) {
+      setSuggestions([]);
+      return;
     }
-    onApplyFilters({ name, industry, type, employees, radius });
-  }, [type]);
+    setLoading(true);
+    fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
+      .then(res => res.json())
+      .then((data: Entreprise[]) => setSuggestions(data))
+      .catch(err => {
+        console.error('Erreur fetch suggestions', err);
+        setSuggestions([]);
+      })
+      .finally(() => setLoading(false));
+  }, [searchTerm]);
 
-  // Appliquer le rayon automatiquement
-  useEffect(() => {
-    onApplyFilters({ name, industry, type, employees, radius });
-  }, [radius]);
-
-  const handleSearchClick = () => {
-    toast.info('La recherche sera bientôt disponible');
+  const handleSelect = (e: Entreprise) => {
+    setSearchTerm(e.name);
+    setSuggestions([]);
+    onSelectEntreprise(e);
   };
-
-  const handleApplyClick = () => {
-    onApplyFilters({ name, industry, type, employees, radius });
-    // toast.success('Filtres appliqués');
-  };
-
-  const employeeOptions = EmployeesCategoriesByType[type];
 
   return (
     <aside className="sidebar">
-      <button className="btn-primary mb-4" onClick={handleSearchClick}>
-        Rechercher
-      </button>
       <input
         type="text"
         className="search"
-        placeholder="Rechercher entreprises"
-        value={name}
-        onChange={e => setName(e.target.value)}
+        placeholder="Rechercher par nom, SIREN ou adresse"
+        value={searchTerm}
+        onChange={e => setSearchTerm(e.target.value)}
       />
-      <h2>Filtrer les résultats</h2>
-
-      <div className="filter-group">
-        <label htmlFor="business-name">Nom de l'entreprise</label>
-        <input
-          type="text"
-          id="business-name"
-          placeholder="Ex : Aube"
-          value={name}
-          onChange={e => setName(e.target.value)}
-        />
-      </div>
-
-      <div className="filter-group">
-        <label htmlFor="industry">Secteur</label>
-        <select id="industry" value={industry} onChange={e => setIndustry(e.target.value)}>
-          <option value="">Ex : Construction</option>
-          <option value="Construction">Construction</option>
-          <option value="Software">Logiciel</option>
-        </select>
-      </div>
-
-      <div className="filter-group">
-        <label htmlFor="type">Type</label>
-        <select id="type" value={type} onChange={e => setType(e.target.value as EntrepriseType)}>
-          {Object.values(EntrepriseType).map(t => (
-            <option key={t} value={t}>{t}</option>
+      {loading && <div className="loading">Chargement...</div>}
+      {suggestions.length > 0 && (
+        <ul className="suggestions">
+          {suggestions.map((e, i) => (
+            <li key={i} onClick={() => handleSelect(e)}>
+              {e.name} — {e.siren} — {e.address}
+            </li>
           ))}
-        </select>
-      </div>
+        </ul>
+      )}
 
-      <div className="filter-group">
-        <label htmlFor="employees">Effectifs</label>
-        <select id="employees" value={employees} onChange={e => setEmployees(e.target.value as EmployeesCategory)}>
-          {employeeOptions.map(o => (
-            <option key={o} value={o}>{o}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="slider-group">
-        <span>Rayon</span>
-        <input
-          type="range"
-          min="1"
-          max="50"
-          value={radius}
-          onChange={e => setRadius(Number(e.target.value))}
-        />
-        <span>{radius} km</span>
-      </div>
-
-      <button className="btn-primary" onClick={handleApplyClick}>
-        Appliquer les filtres
-      </button>
+      {/*
+        Ces contrôles sont commentés pour l'instant :
+        <h2>Filtrer les résultats</h2>
+        <div className="filter-group">
+          <label>Type</label>
+          <select>
+            <option>Prospect</option>
+            <option>Client</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>Effectifs</label>
+          <select>
+            <option>50-99</option>
+          </select>
+        </div>
+        <div className="slider-group">
+          <span>Rayon</span>
+          <input type="range" min="1" max="50" />
+          <span>22 km</span>
+        </div>
+        <button className="btn-primary">Appliquer les filtres</button>
+      */}
     </aside>
-  );
+);
 };
 
 export default Sidebar;

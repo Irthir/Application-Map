@@ -51,6 +51,6 @@ export interface Entreprise {
   siren: string;
   employeesCategory: EmployeesCategory;
   address: string;
-  position: [number, number]; // [lng, lat]
+  position: [number, number];
 }
 
