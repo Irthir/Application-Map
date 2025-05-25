@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-// import { geocodeCompany } from "../services/apiUtils"; // Si utilisé
 
 interface SearchAPEProps {
   onResults: (data: any[]) => void;

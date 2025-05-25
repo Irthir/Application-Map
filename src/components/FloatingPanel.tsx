@@ -1,6 +1,6 @@
 // src/components/FloatingPanel.tsx
 import React from 'react';
-import { Entreprise, EntrepriseType } from '../type';
+import { Entreprise, EntrepriseType } from '../type.ts';
 
 // Tableau par défaut pour fallback
 const dummyEntreprises: Entreprise[] = [
