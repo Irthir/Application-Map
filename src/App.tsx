@@ -11,16 +11,26 @@ const App: React.FC = () => {
   const filterRadius = 20;
 
   useEffect(() => {
-    fetch('/api/all')
+    fetch('https://application-map.onrender.com/api/all')
       .then(res => {
         if (!res.ok) throw new Error(`API /all failed: ${res.status}`);
         return res.json();
       })
-      .then((data: Entreprise[]) => {
+      .then((raw: Entreprise[]) => {
+        // Parser position string => [lng, lat]
+        const data = raw
+          .map(e => {
+            if (typeof e.position === 'string') {
+              const [lng, lat] = (e.position as string)
+                .replace(/[\[\]\s]/g, '')
+                .split(',')
+                .map(Number);
+              return { ...e, position: [lng, lat] as [number, number] };
+            }
+            return e;
+          });
         setEntreprises(data);
-        if (data.length) {
-          setCenter(data[0].position);
-        }
+        if (data.length) setCenter(data[0].position);
       })
       .catch(err => console.error('Erreur chargement /api/all :', err));
   }, []);

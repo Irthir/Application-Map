@@ -17,12 +17,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
       return;
     }
     setLoading(true);
-    fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
-      .then(r => {
-        if (!r.ok) throw new Error(r.status.toString());
-        return r.json();
+    fetch(`https://application-map.onrender.com/api/search?term=${encodeURIComponent(searchTerm)}`)
+      .then(r => { if (!r.ok) throw new Error(r.status.toString()); return r.json(); })
+      .then((rows: Entreprise[]) => {
+        // parser position string en [lng, lat]
+        const parsed = rows.map(e => {
+          if (typeof e.position === 'string') {
+            const posStr = e.position as string;
+            const [lng, lat] = posStr
+              .replace(/[\[\]\s]/g, '')
+              .split(',')
+              .map(Number);
+            return { ...e, position: [lng, lat] as [number, number] };
+          }
+          return e;
+        });
+        setSuggestions(parsed);
       })
-      .then((rows: Entreprise[]) => setSuggestions(rows))
       .catch(() => setSuggestions([]))
       .finally(() => setLoading(false));
   }, [searchTerm]);
