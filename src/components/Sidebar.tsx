@@ -1,32 +1,31 @@
 // src/components/Sidebar.tsx
-import React, { useState, useMemo } from 'react';
-import { Entreprise } from '../type';
+import React, { useState, useEffect } from 'react';
+import { Entreprise } from '../type.ts';
 
 interface SidebarProps {
-  data: Entreprise[];
   onSelectEntreprise: (e: Entreprise) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ data, onSelectEntreprise }) => {
+const Sidebar: React.FC<SidebarProps> = ({ onSelectEntreprise }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const suggestions = useMemo(() => {
-    const term = searchTerm.toLowerCase().trim();
-    if (!term) return [];
-
-    return data
-      .filter(e =>
-        e.name.toLowerCase().includes(term) ||
-        e.siren.includes(term) ||
-        e.address.toLowerCase().includes(term)
-      )
-      .slice(0, 5);
-  }, [searchTerm, data]);
-
-  const handleSelect = (e: Entreprise) => {
-    setSearchTerm(e.name);
-    onSelectEntreprise(e);
-  };
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/search?term=${encodeURIComponent(searchTerm)}`)
+      .then(r => {
+        if (!r.ok) throw new Error(r.status.toString());
+        return r.json();
+      })
+      .then((rows: Entreprise[]) => setSuggestions(rows))
+      .catch(() => setSuggestions([]))
+      .finally(() => setLoading(false));
+  }, [searchTerm]);
 
   return (
     <aside className="sidebar">
@@ -37,26 +36,23 @@ const Sidebar: React.FC<SidebarProps> = ({ data, onSelectEntreprise }) => {
         value={searchTerm}
         onChange={e => setSearchTerm(e.target.value)}
       />
-      
+      {loading && <div className="loading">Chargement...</div>}
+
       {suggestions.length > 0 ? (
         <ul className="suggestions">
-          {suggestions.map((e, idx) => (
-            <li key={e.siren + idx} onClick={() => handleSelect(e)}>
+          {suggestions.map((e, i) => (
+            <li key={e.siren + i} onClick={() => onSelectEntreprise(e)}>
               {e.name || '—'} — {e.siren} — {e.address}
             </li>
           ))}
         </ul>
       ) : (
         searchTerm && (
-          <div className="no-results">
-            Aucun résultat pour “{searchTerm}”
-          </div>
+          <div className="no-results">Aucun résultat pour “{searchTerm}”</div>
         )
       )}
 
-      {/* 
-        Contrôles de filtre (désactivés pour le moment)
-      */}
+      {/* Filtres désactivés */}
       <div className="filters">
         <h2>Filtrer les résultats</h2>
         <div className="filter-group">
@@ -82,7 +78,6 @@ const Sidebar: React.FC<SidebarProps> = ({ data, onSelectEntreprise }) => {
         </div>
         <button className="btn-primary">Appliquer les filtres</button>
       </div>
-
     </aside>
   );
 };
