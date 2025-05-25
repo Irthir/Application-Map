@@ -16,7 +16,7 @@ const bq = new BigQuery({
 });
 
 // Table BigQuery (dataset.table)
-const TABLE_ID = `\`${process.env.GCP_PROJECT_ID}.sirene_data.merged_sirene\``;
+const TABLE_ID = '`application-map-458717.sirene_data.merged_sirene`';
 
 // Vérifie qu'une entreprise a bien tous ses champs et une position parseable
 function isCompleteEntreprise(e) {
