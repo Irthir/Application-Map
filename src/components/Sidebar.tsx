@@ -113,7 +113,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Recherche */}
       <div className="search-container">
         <h2>Rechercher par catégorie</h2>
-        {/*TODO : Ici intégrer une liste simplifiées des codes NAF, un slider pour le rayon de 5 à 50 km, et un bouton de recherche*/}
+        {/*TODO : Ici intégrer une liste simplifiées des codes NAF, un slider pour le rayon de 5 à 50 km sur la carte, et un bouton de recherche*/
+        /*Cette recherche va donc récupérer toutes les entreprises correspondant à la catégorie large d'un code naf dans le rayon donné autour du centre posé par l'utilisateur sur la carte.*/}
       </div>
 
       {/* Mes clients & prospects */}
