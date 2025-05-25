@@ -106,3 +106,32 @@ body { font-family: var(--font-family); color: #111827; }
   background: #F3F4F6;
 }
 aside.sidebar { position: relative; }
+
+/* src/index.css (ou votre fichier CSS global) */
+.list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: #fff;
+  max-height: 300px;     /* hauteur maximale de la FloatingPanel */
+  overflow-y: auto;      /* scroll vertical si dépassement */
+}
+
+.list-header {
+  flex: 0 0 auto;
+  padding: 12px;
+  font-weight: bold;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.list-item {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}

@@ -18,56 +18,101 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
   const map = React.useRef<mapboxgl.Map | null>(null);
   const markersRef = React.useRef<mapboxgl.Marker[]>([]);
 
+  // Initialisation de la carte
   React.useEffect(() => {
     if (!mapContainer.current) return;
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v11',
       center,
       zoom: 12,
     });
+
+    // Clic sur la carte pour déplacer le centre
     map.current.on('click', (e) => {
       const features = map.current?.queryRenderedFeatures(e.point) || [];
       const clickedCircle = features.some(f => f.layer?.id === 'search-radius-circle');
-      if (!clickedCircle) onClickSetCenter(e.lngLat.lat, e.lngLat.lng);
+      if (!clickedCircle) {
+        onClickSetCenter(e.lngLat.lat, e.lngLat.lng);
+      }
     });
+
     return () => map.current?.remove();
   }, []);
 
+  // Recentrage animé quand la prop `center` change
   React.useEffect(() => {
     if (!map.current) return;
+    map.current.flyTo({ center, essential: true });
+  }, [center]);
+
+  // Affichage des marqueurs
+  React.useEffect(() => {
+    if (!map.current) return;
+
+    // Supprime les anciens marqueurs
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
+
+    // Ajoute un marqueur par entreprise
     data.forEach(e => {
       let color = '#6B7280';
       if (e.type === EntrepriseType.Client)   color = '#10B981';
       if (e.type === EntrepriseType.Prospect) color = '#F59E0B';
+
       const popup = new mapboxgl.Popup({ offset: 25 })
-        .setHTML(
-          `<div style="font-size:14px;line-height:1.3"><strong>${e.name}</strong><br/>Type : ${e.type}<br/>NAF : ${e.codeNAF}<br/>SIREN : ${e.siren}</div>`
-        );
+        .setHTML(`
+          <div style="font-size:14px;line-height:1.3">
+            <strong>${e.name}</strong><br/>
+            Type : ${e.type}<br/>
+            NAF : ${e.codeNAF}<br/>
+            SIREN : ${e.siren}
+          </div>
+        `);
+
       const marker = new mapboxgl.Marker({ color })
         .setLngLat(e.position)
         .setPopup(popup)
         .addTo(map.current!);
+
       markersRef.current.push(marker);
     });
   }, [data]);
 
+  // Dessin du cercle de filtre autour du centre
   React.useEffect(() => {
     if (!map.current) return;
+
     const sourceId = 'search-radius-circle';
     const drawCircle = () => {
-      const circle = turf.circle(center, filterRadius, { steps: 64, units: 'kilometers' });
+      const circle = turf.circle(center, filterRadius, {
+        steps: 64,
+        units: 'kilometers',
+      });
+
       if (map.current!.getSource(sourceId)) {
         (map.current!.getSource(sourceId) as mapboxgl.GeoJSONSource).setData(circle);
       } else {
         map.current!
           .addSource(sourceId, { type: 'geojson', data: circle })
-          .addLayer({ id: sourceId, type: 'fill', source: sourceId, paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.2 } });
+          .addLayer({
+            id: sourceId,
+            type: 'fill',
+            source: sourceId,
+            paint: {
+              'fill-color': '#3B82F6',
+              'fill-opacity': 0.2,
+            },
+          });
       }
     };
-    if (map.current.isStyleLoaded()) drawCircle(); else map.current.once('style.load', drawCircle);
+
+    if (map.current.isStyleLoaded()) {
+      drawCircle();
+    } else {
+      map.current.once('style.load', drawCircle);
+    }
   }, [center, filterRadius]);
 
   return <div ref={mapContainer} className="mapbox-container" />;

@@ -12,19 +12,16 @@ app.use(express.json());
 
 // Instanciation BigQuery
 const bq = new BigQuery({
-  projectId: process.env.GCP_PROJECT_ID,  // ou + automatique via GOOGLE_APPLICATION_CREDENTIALS
+  projectId: process.env.GCP_PROJECT_ID,
 });
 
 // Nom complet de votre table
 const TABLE_ID = '`application-map-458717.sirene_data.merged_sirene`';
 
-// server.js (juste après tes imports)
+// Vérifie que l’entreprise a bien tous les champs requis
 function isCompleteEntreprise(e) {
-  // Vérifie le nom
   if (!e.name || typeof e.name !== 'string' || !e.name.trim()) return false;
-  // Vérifie la tranche d'effectif
   if (!e.employeesCategory || typeof e.employeesCategory !== 'string') return false;
-  // Vérifie la position et ses deux composantes numériques
   if (
     !e.position ||
     !Array.isArray(e.position) ||
@@ -39,8 +36,7 @@ function isCompleteEntreprise(e) {
   return true;
 }
 
-
-// GET /api/all — renvoie toutes les entreprises
+// GET /api/all — renvoie toutes les entreprises complètes
 app.get('/api/all', async (_req, res) => {
   try {
     const query = `
@@ -57,10 +53,11 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
-// GET /api/search?term=… — renvoie jusqu’à 5 suggestions
+// GET /api/search?term=… — renvoie jusqu’à 5 suggestions (nom, SIREN ou adresse)
 app.get('/api/search', async (req, res) => {
-  const termRaw = ((req.query.term || '')).trim().toLowerCase();
+  const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
+
   try {
     const query = `
       SELECT siren, name, codeNAF, employeesCategory, address, position
@@ -73,14 +70,14 @@ app.get('/api/search', async (req, res) => {
     const options = {
       query,
       params: {
-        patt: `%${termRaw}%`,
+        patt: `%${termRaw}%`,  // ← ici, on utilise simplement `%${termRaw}%`
         term: termRaw
       }
     };
     const [job] = await bq.createQueryJob(options);
     const [rows] = await job.getQueryResults();
-    const filtered = rows
-      // parser position en nombres si nécessaire (si c’était du string)
+
+    const results = rows
       .map(e => {
         if (typeof e.position === 'string') {
           const [lng, lat] = e.position
@@ -92,11 +89,14 @@ app.get('/api/search', async (req, res) => {
         return e;
       })
       .filter(isCompleteEntreprise);
-    res.json(filtered);
+
+    res.json(results);
   } catch (err) {
     console.error('BigQuery /search error:', err);
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
 });
 
-app.listen(PORT, () => console.log(`🚀 Serveur démarré sur le port ${PORT}`));
+app.listen(PORT, () => {
+  console.log('🚀 Serveur démarré sur le port \${PORT}\'');
+});
