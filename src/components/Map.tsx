@@ -1,4 +1,5 @@
-import React from 'react';
+// src/components/Map.tsx
+import React, { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -14,83 +15,63 @@ interface MapProps {
 }
 
 const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter }) => {
-  const mapContainer = React.useRef<HTMLDivElement>(null);
-  const map = React.useRef<mapboxgl.Map | null>(null);
-  const markersRef = React.useRef<mapboxgl.Marker[]>([]);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markers = useRef<mapboxgl.Marker[]>([]);
 
-  // Initialisation de la carte
-  React.useEffect(() => {
-    if (!mapContainer.current) return;
-
+  // 1️⃣ Initialisation de la carte
+  useEffect(() => {
+    if (map.current || !mapContainer.current) return;
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/streets-v11',
       center,
       zoom: 12,
     });
-
-    // Clic sur la carte pour déplacer le centre
-    map.current.on('click', (e) => {
+    map.current.addControl(new mapboxgl.NavigationControl());
+    map.current.on('click', e => {
       const features = map.current?.queryRenderedFeatures(e.point) || [];
       const clickedCircle = features.some(f => f.layer?.id === 'search-radius-circle');
-      if (!clickedCircle) {
-        onClickSetCenter(e.lngLat.lat, e.lngLat.lng);
-      }
+      if (!clickedCircle) onClickSetCenter(e.lngLat.lat, e.lngLat.lng);
     });
+  }, [onClickSetCenter]);
 
-    return () => map.current?.remove();
-  }, []);
-
-  // Recentrage animé quand la prop `center` change
-  React.useEffect(() => {
+  // 2️⃣ Vol vers le centre
+  useEffect(() => {
     if (!map.current) return;
     map.current.flyTo({ center, essential: true });
   }, [center]);
 
-  // Affichage des marqueurs
-  React.useEffect(() => {
+  // 3️⃣ Marqueurs
+  useEffect(() => {
     if (!map.current) return;
-
-    // Supprime les anciens marqueurs
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    // Ajoute un marqueur par entreprise
+    markers.current.forEach(m => m.remove());
+    markers.current = [];
     data.forEach(e => {
-      let color = '#6B7280';
-      if (e.type === EntrepriseType.Client)   color = '#10B981';
-      if (e.type === EntrepriseType.Prospect) color = '#F59E0B';
-
-      const popup = new mapboxgl.Popup({ offset: 25 })
-        .setHTML(`
+      const color =
+        e.type === EntrepriseType.Client   ? '#10B981' :
+        e.type === EntrepriseType.Prospect ? '#F59E0B' : '#6B7280';
+      const marker = new mapboxgl.Marker({ color })
+        .setLngLat(e.position)
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
           <div style="font-size:14px;line-height:1.3">
             <strong>${e.name}</strong><br/>
             Type : ${e.type}<br/>
             NAF : ${e.codeNAF}<br/>
             SIREN : ${e.siren}
           </div>
-        `);
-
-      const marker = new mapboxgl.Marker({ color })
-        .setLngLat(e.position)
-        .setPopup(popup)
+        `))
         .addTo(map.current!);
-
-      markersRef.current.push(marker);
+      markers.current.push(marker);
     });
   }, [data]);
 
-  // Dessin du cercle de filtre autour du centre
-  React.useEffect(() => {
+  // 4️⃣ Cercle de filtre (avec attente du style)
+  useEffect(() => {
     if (!map.current) return;
-
     const sourceId = 'search-radius-circle';
-    const drawCircle = () => {
-      const circle = turf.circle(center, filterRadius, {
-        steps: 64,
-        units: 'kilometers',
-      });
-
+    const draw = () => {
+      const circle = turf.circle(center, filterRadius, { steps: 64, units: 'kilometers' });
       if (map.current!.getSource(sourceId)) {
         (map.current!.getSource(sourceId) as mapboxgl.GeoJSONSource).setData(circle);
       } else {
@@ -100,18 +81,15 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
             id: sourceId,
             type: 'fill',
             source: sourceId,
-            paint: {
-              'fill-color': '#3B82F6',
-              'fill-opacity': 0.2,
-            },
+            paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.2 }
           });
       }
     };
 
     if (map.current.isStyleLoaded()) {
-      drawCircle();
+      draw();
     } else {
-      map.current.once('style.load', drawCircle);
+      map.current.once('style.load', draw);
     }
   }, [center, filterRadius]);
 

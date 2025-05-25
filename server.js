@@ -40,12 +40,30 @@ function isCompleteEntreprise(e) {
 app.get('/api/all', async (_req, res) => {
   try {
     const query = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
+      SELECT
+        siren,
+        name,
+        codeNAF,
+        employeesCategory,
+        address,
+        ST_X(position) AS lng,
+        ST_Y(position) AS lat
       FROM ${TABLE_ID}
     `;
     const [job] = await bq.createQueryJob({ query });
     const [rows] = await job.getQueryResults();
-    const filtered = rows.filter(isCompleteEntreprise);
+
+    const filtered = rows
+      .map(r => ({
+        siren: r.siren,
+        name: r.name,
+        codeNAF: r.codeNAF,
+        employeesCategory: r.employeesCategory,
+        address: r.address,
+        position: [Number(r.lng), Number(r.lat)]
+      }))
+      .filter(isCompleteEntreprise);
+
     res.json(filtered);
   } catch (err) {
     console.error('BigQuery /all error:', err);
@@ -60,7 +78,14 @@ app.get('/api/search', async (req, res) => {
 
   try {
     const query = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
+      SELECT
+        siren,
+        name,
+        codeNAF,
+        employeesCategory,
+        address,
+        ST_X(position) AS lng,
+        ST_Y(position) AS lat
       FROM ${TABLE_ID}
       WHERE LOWER(name) LIKE @patt
          OR siren = @term
@@ -70,7 +95,7 @@ app.get('/api/search', async (req, res) => {
     const options = {
       query,
       params: {
-        patt: `%${termRaw}%`,  // ← ici, on utilise simplement `%${termRaw}%`
+        patt: `%${termRaw}%`,
         term: termRaw
       }
     };
@@ -78,16 +103,14 @@ app.get('/api/search', async (req, res) => {
     const [rows] = await job.getQueryResults();
 
     const results = rows
-      .map(e => {
-        if (typeof e.position === 'string') {
-          const [lng, lat] = e.position
-            .replace(/[\[\]\s]/g, '')
-            .split(',')
-            .map(Number);
-          return { ...e, position: [lng, lat] };
-        }
-        return e;
-      })
+      .map(r => ({
+        siren: r.siren,
+        name: r.name,
+        codeNAF: r.codeNAF,
+        employeesCategory: r.employeesCategory,
+        address: r.address,
+        position: [Number(r.lng), Number(r.lat)]
+      }))
       .filter(isCompleteEntreprise);
 
     res.json(results);
@@ -98,5 +121,5 @@ app.get('/api/search', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log('🚀 Serveur démarré sur le port \${PORT}\'');
+  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
 });

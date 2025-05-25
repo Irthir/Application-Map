@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Entreprise, EntrepriseType } from '../type.ts';
 
 interface SidebarProps {
-  data: Entreprise[];                              // clients/prospects classés
-  onSelectEntreprise: (e: Entreprise) => void;     // pour afficher un résultat recherché
+  data: Entreprise[];
+  onSelectEntreprise: (e: Entreprise) => void;
   onClassify: (e: Entreprise, newType: EntrepriseType) => void;
   onLocate: (e: Entreprise) => void;
   onRemove: (e: Entreprise) => void;
@@ -72,7 +72,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className="sidebar">
       {/* Recherche */}
-      <div className="search-container" style={{ position: 'relative' }}>
+      <div className="search-container">
+        <h2>Rechercher par nom, SIREN ou adresse</h2>
         <input
           type="text"
           className="search"
@@ -84,29 +85,21 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             className="clear-suggestions"
             onClick={() => setSuggestions([])}
-            style={{
-              position: 'absolute',
-              right: 8,
-              top: 8,
-              background: 'transparent',
-              border: 'none',
-              fontSize: 16,
-              cursor: 'pointer'
-            }}
             aria-label="Fermer la liste"
           >
             ×
           </button>
         )}
       </div>
+
       {loading && <div className="loading">Chargement...</div>}
+
       {term.length >= 3 && suggestions.length > 0 && (
         <ul className="suggestions">
           {suggestions.map((e, i) => (
             <li
               key={e.siren + i}
               onClick={() => handleSuggestionClick(e)}
-              style={{ cursor: 'pointer' }}
             >
               {e.name || '—'} — {e.siren} — {e.address}
             </li>
@@ -116,34 +109,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       {term.length >= 3 && !loading && suggestions.length === 0 && (
         <div className="no-results">Aucun résultat pour “{term}”</div>
       )}
-
-      {/* Filtres désactivés */}
-      <div className="filters">
-        <h2>Filtres</h2>
-        <div className="filter-group">
-          <label>Type</label>
-          <select disabled>
-            <option>Prospect</option>
-            <option>Client</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label>Effectifs</label>
-          <select disabled>
-            <option>1-9</option>
-            <option>10-49</option>
-            <option>50-99</option>
-            <option>100+</option>
-          </select>
-        </div>
-        <div className="slider-group">
-          <span>Rayon</span>
-          <input type="range" min="1" max="50" disabled />
-          <span>22 km</span>
-        </div>
-        <button className="btn-primary" disabled>
-          Appliquer
-        </button>
+      
+      {/* Recherche */}
+      <div className="search-container">
+        <h2>Rechercher par catégorie</h2>
+        {/*TODO : Ici intégrer une liste simplifiées des codes NAF, un slider pour le rayon de 5 à 50 km, et un bouton de recherche*/}
       </div>
 
       {/* Mes clients & prospects */}
@@ -154,12 +124,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           data.map((e, i) => (
             <div key={e.siren + i} className="user-item">
-              <div className="user-info">
-                <div className="name">{e.name || '—'}</div>
-                <div className="address">{e.address}</div>
+              <div>
+                <strong>{e.name || '—'}</strong><br/>
+                <small>{e.address}</small>
               </div>
               <div className="user-actions">
-                {/* bascule Client ↔ Prospect */}
                 <button
                   className="btn-sm"
                   onClick={() =>
@@ -173,7 +142,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                   {e.type === EntrepriseType.Client ? 'Prospect' : 'Client'}
                 </button>
-                {/* recentrer sur la carte */}
                 <button
                   className="icon-btn"
                   title="Localiser"
@@ -181,7 +149,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                   📍
                 </button>
-                {/* supprimer de la liste et de la carte */}
                 <button
                   className="icon-btn"
                   title="Supprimer"
