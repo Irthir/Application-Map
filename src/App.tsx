@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [center, setCenter] = useState<[number, number]>([2.3522, 48.8566]);
   const filterRadius = 20;
 
-  // 1) Sélection dans la FloatingPanel → ajoute à la recherche et au map
+  // 1) Sélection depuis recherche textuelle
   const handleSelectEntreprise = (e: Entreprise) => {
     setCenter(e.position);
     setSearchHistory(prev =>
@@ -28,7 +28,7 @@ const App: React.FC = () => {
     );
   };
 
-  // 2a) Classification depuis FloatingPanel → passe dans userData, mapData et l'enlève de searchHistory
+  // 2a) Classification depuis FloatingPanel
   const handleSearchClassify = (e: Entreprise, newType: EntrepriseType) => {
     const classified = { ...e, type: newType };
     setUserData(prev =>
@@ -44,14 +44,14 @@ const App: React.FC = () => {
     );
   };
 
-  // 2b) Suppression depuis FloatingPanel → enlève juste de searchHistory
+  // 2b) Suppression depuis FloatingPanel
   const handleSearchRemove = (e: Entreprise) => {
     setSearchHistory(prev =>
       prev.filter(x => x.siren !== e.siren)
     );
   };
 
-  // 3a) Classification depuis Sidebar → change le type dans userData et mapData
+  // 3a) Classification depuis Sidebar
   const handleUserClassify = (e: Entreprise, newType: EntrepriseType) => {
     setUserData(prev =>
       prev.map(x =>
@@ -65,7 +65,7 @@ const App: React.FC = () => {
     );
   };
 
-  // 3b) Suppression depuis Sidebar → retire de userData et mapData
+  // 3b) Suppression depuis Sidebar
   const handleUserRemove = (e: Entreprise) => {
     setUserData(prev =>
       prev.filter(x => x.siren !== e.siren)
@@ -75,54 +75,40 @@ const App: React.FC = () => {
     );
   };
 
-  // Recentrage manuel sur la carte
+  // 4) Recentrage manuel depuis Sidebar ou FloatingPanel
   const handleLocate = (e: Entreprise) => {
     setCenter(e.position);
   };
 
-  // Clic direct sur la carte  
+  // 5) Clic direct sur la carte
   const handleMapClick = (lat: number, lng: number) => {
     setCenter([lng, lat]);
   };
 
-  // Nouvelle recherche par filtres (NAF, effectifs, rayon)
+  // 6) Recherche par filtres (NAF, effectifs, rayon)
   const handleFilterSearch = async (filters: {
     naf: string;
     employeesCategory: string;
     radius: number;
   }) => {
     const { naf, employeesCategory, radius } = filters;
-    // On passe aussi le centre actuel pour la requête spatiale
-    const [lng, lat] = center;
+    // Construire les params, en incluant le centre actuel de la carte
+    const params = new URLSearchParams({
+      naf,
+      employeesCategory,
+      radius: radius.toString(),
+      lng: center[0].toString(),
+      lat: center[1].toString(),
+    });
     try {
-      const params = new URLSearchParams({
-        naf,
-        employeesCategory,
-        radius: radius.toString(),
-        lat: lat.toString(),
-        lng: lng.toString(),
-      });
-      const res = await fetch(`https://application-map.onrender.com/api/searchCategory?${params}`);
-      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const res = await fetch(
+        `https://application-map.onrender.com/api/search-filters?${params}`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const rows: Entreprise[] = await res.json();
-      // parser positions si besoin
-      const parsed = rows.map(e => {
-        if (typeof e.position === 'string') {
-          const [plng, plat] = (e.position as string)
-            .replace(/[\[\]\s]/g, '')
-            .split(',')
-            .map(Number);
-          return { ...e, position: [plng, plat] as [number, number] };
-        }
-        return e;
-      });
-      // on ajoute ces résultats à searchHistory et mapData
-      setSearchHistory(prev =>
-        [...prev, ...parsed.filter(e => !prev.some(x => x.siren === e.siren))]
-      );
-      setMapData(prev =>
-        [...prev, ...parsed.filter(e => !prev.some(x => x.siren === e.siren))]
-      );
+      // Remplace l'historique de recherche et les marqueurs par ces résultats
+      setSearchHistory(rows);
+      setMapData(rows);
     } catch (err) {
       console.error('Recherche par filtres échouée :', err);
     }
@@ -136,7 +122,7 @@ const App: React.FC = () => {
         onClassify={handleUserClassify}
         onLocate={handleLocate}
         onRemove={handleUserRemove}
-        onFilterSearch={handleFilterSearch}   // ← nouveau
+        onFilterSearch={handleFilterSearch}
       />
 
       <div className="main">

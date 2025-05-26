@@ -24,19 +24,19 @@ const Sidebar: React.FC<SidebarProps> = ({
   onRemove,
   onFilterSearch
 }) => {
-  // recherche texte
+  // Recherche texte
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // filtres
+  // Filtres
   const [naf, setNaf] = useState(''); // ex. '47.11' ou ''
   const [employeesCategory, setEmployeesCategory] = useState(''); // ex. '1-9'
   const [radius, setRadius] = useState(20); // km
 
   const term = searchTerm.trim();
 
-  // effet pour la recherche texte
+  // Effet pour la recherche texte
   useEffect(() => {
     if (term.length < 3) {
       setSuggestions([]);
@@ -109,37 +109,35 @@ const Sidebar: React.FC<SidebarProps> = ({
             ×
           </button>
         )}
+
+        {loading && <div className="loading">Chargement...</div>}
+
+        {term.length >= 3 && suggestions.length > 0 && (
+          <ul className="suggestions">
+            {suggestions.map((e, i) => (
+              <li key={e.siren + i} onClick={() => handleSuggestionClick(e)}>
+                {e.name || '—'} — {e.siren} — {e.address}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {term.length >= 3 && !loading && suggestions.length === 0 && (
+          <div className="no-results">Aucun résultat pour « {term} »</div>
+        )}
       </div>
-
-      {loading && <div className="loading">Chargement...</div>}
-
-      {term.length >= 3 && suggestions.length > 0 && (
-        <ul className="suggestions">
-          {suggestions.map((e, i) => (
-            <li key={e.siren + i} onClick={() => handleSuggestionClick(e)}>
-              {e.name || '—'} — {e.siren} — {e.address}
-            </li>
-          ))}
-        </ul>
-      )}
-      {term.length >= 3 && !loading && suggestions.length === 0 && (
-        <div className="no-results">Aucun résultat pour « {term} »</div>
-      )}
 
       {/* Recherche par filtres */}
       <div className="filters">
         <h2>Recherche par catégorie</h2>
 
         <label>Code NAF</label>
-        <select
-          value={naf}
-          onChange={e => setNaf(e.target.value)}
-        >
+        <select value={naf} onChange={e => setNaf(e.target.value)}>
           <option value="">-- Tous --</option>
-          <option value="47.11">47.11 – Commerce de détail de produits alimentaires</option>
-          <option value="45.20">45.20 – Entretien et réparation de véhicules automobiles</option>
+          <option value="47.11">47.11 – Commerce de détail alimentaire</option>
+          <option value="45.20">45.20 – Entretien et réparation auto</option>
           <option value="62.01">62.01 – Programmation informatique</option>
-          {/* Ajoute tes principales catégories ici */}
+          {/* Ajoutez ici vos principales catégories */}
         </select>
 
         <label>Effectifs</label>
@@ -165,10 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           />
         </label>
 
-        <button
-          className="btn-primary"
-          onClick={handleFilterClick}
-        >
+        <button className="btn-primary" onClick={handleFilterClick}>
           Lancer la recherche
         </button>
       </div>
@@ -176,13 +171,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Mes clients & prospects */}
       <div className="user-list">
         <h2>Mes clients &amp; prospects</h2>
+
         {data.length === 0 ? (
           <div className="empty">Aucune entreprise ajoutée.</div>
         ) : (
           data.map((e, i) => (
             <div key={e.siren + i} className="user-item">
               <div>
-                <strong>{e.name || '—'}</strong><br/>
+                <strong>{e.name || '—'}</strong><br />
                 <small>{e.address}</small>
               </div>
               <div className="user-actions">

@@ -1,9 +1,8 @@
-
 // server.js
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import fetch from 'node-fetch';               // n'oublie pas d'installer node-fetch
+import fetch from 'node-fetch';               // npm install node-fetch
 import { BigQuery } from '@google-cloud/bigquery';
 
 const app = express();
@@ -17,27 +16,24 @@ const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJ
 if (!MAPBOX_TOKEN) {
   console.warn('⚠️ MAPBOX_TOKEN non défini – la géolocalisation par adresse tombera toujours sur Paris');
 }
-const geoCache = new Map(); // address → [lng, lat]
+const geoCache = new Map();
 
 async function ensureCoords(e) {
-  // si ce n'est pas la paire par défaut, on ne touche pas
   const [lng0, lat0] = e.position;
+  // si on n’est pas sur Paris (valeur par défaut) ou pas d’adresse, on laisse tel quel
   if (!(lng0 === 2.3522 && lat0 === 48.8566) || !e.address) {
     return e;
   }
-  // cache
   if (geoCache.has(e.address)) {
     return { ...e, position: geoCache.get(e.address) };
   }
-  // appel Mapbox
   try {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/` +
-                `${encodeURIComponent(e.address)}.json?` +
-                `access_token=${MAPBOX_TOKEN}&limit=1`;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/`
+              + `${encodeURIComponent(e.address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
     const resp = await fetch(url);
     if (resp.ok) {
       const js = await resp.json();
-      if (js.features && js.features.length > 0) {
+      if (js.features?.length) {
         const [lng, lat] = js.features[0].center;
         geoCache.set(e.address, [lng, lat]);
         return { ...e, position: [lng, lat] };
@@ -63,14 +59,16 @@ function isCompleteEntreprise(e) {
       && !Number.isNaN(lng) && !Number.isNaN(lat);
 }
 
-// utilitaire pour parser la position issue de BigQuery
+// lit la chaîne "[lng,lat]" et renvoie [lng, lat]
 function parsePosition(raw) {
-  const str = String(raw);
-  const [lng, lat] = str.replace(/[\[\]\s]/g, '').split(',').map(Number);
+  const [lng, lat] = String(raw)
+    .replace(/[\[\]\s]/g, '')
+    .split(',')
+    .map(Number);
   return [lng, lat];
 }
 
-// GET /api/all — renvoie toutes les entreprises complètes, géolocalisées
+// GET /api/all — toutes les entreprises complètes, géocodées
 app.get('/api/all', async (_req, res) => {
   try {
     const query = `
@@ -92,7 +90,7 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
-// GET /api/search?term=… — renvoie jusqu’à 5 suggestions, géolocalisées
+// GET /api/search?term=… — jusqu’à 5 suggestions texte, géocodées
 app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
@@ -124,6 +122,44 @@ app.get('/api/search', async (req, res) => {
     res.json(enriched);
   } catch (err) {
     console.error('BigQuery /search error:', err);
+    res.status(500).json({ error: 'Erreur interne BigQuery' });
+  }
+});
+
+// GET /api/search-filters?naf=…&employeesCategory=… — recherche par filtres
+app.get('/api/search-filters', async (req, res) => {
+  const nafRaw = String(req.query.naf || '').trim();
+  const empRaw = String(req.query.employeesCategory || '').trim();
+  if (!nafRaw || !empRaw) {
+    return res.status(400).json({ error: 'naf et employeesCategory sont requis' });
+  }
+
+  try {
+    const query = `
+      SELECT siren, name, codeNAF, employeesCategory, address, position
+      FROM ${TABLE_ID}
+      WHERE codeNAF LIKE @naf
+        AND employeesCategory = @emp
+      LIMIT 100
+    `;
+    const options = {
+      query,
+      params: {
+        naf: `${nafRaw}%`,
+        emp: empRaw
+      }
+    };
+    const [job] = await bq.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    const parsed = rows
+      .map(e => ({ ...e, position: parsePosition(e.position) }))
+      .filter(isCompleteEntreprise);
+
+    const enriched = await Promise.all(parsed.map(ensureCoords));
+    res.json(enriched);
+  } catch (err) {
+    console.error('BigQuery /search-filters error:', err);
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
 });
