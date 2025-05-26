@@ -19,6 +19,7 @@ const App: React.FC = () => {
 
   // 1) Sélection dans la FloatingPanel → ajoute à la recherche et au map
   const handleSelectEntreprise = (e: Entreprise) => {
+    console.log('ENTREPRISE position:', e.position);
     setCenter(e.position);
     setSearchHistory(prev =>
       prev.some(x => x.siren === e.siren) ? prev : [...prev, e]
