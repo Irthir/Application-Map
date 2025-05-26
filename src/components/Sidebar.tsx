@@ -8,6 +8,12 @@ interface SidebarProps {
   onClassify: (e: Entreprise, newType: EntrepriseType) => void;
   onLocate: (e: Entreprise) => void;
   onRemove: (e: Entreprise) => void;
+  /** Nouveau callback pour recherche par filtres */
+  onFilterSearch: (filters: {
+    naf: string;
+    employeesCategory: string;
+    radius: number;
+  }) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -15,29 +21,38 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSelectEntreprise,
   onClassify,
   onLocate,
-  onRemove
+  onRemove,
+  onFilterSearch
 }) => {
+  // recherche texte
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // filtres
+  const [naf, setNaf] = useState(''); // ex. '47.11' ou ''
+  const [employeesCategory, setEmployeesCategory] = useState(''); // ex. '1-9'
+  const [radius, setRadius] = useState(20); // km
+
   const term = searchTerm.trim();
 
+  // effet pour la recherche texte
   useEffect(() => {
     if (term.length < 3) {
       setSuggestions([]);
       setLoading(false);
       return;
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
+    const ctl = new AbortController();
+    const to = setTimeout(() => {
       setLoading(true);
       fetch(
         `https://application-map.onrender.com/api/search?term=${encodeURIComponent(term)}`,
-        { signal: controller.signal }
+        { signal: ctl.signal }
       )
-        .then(res => {
-          if (!res.ok) throw new Error(res.status.toString());
-          return res.json();
+        .then(r => {
+          if (!r.ok) throw new Error(r.status.toString());
+          return r.json();
         })
         .then((rows: Entreprise[]) => {
           const parsed = rows.map(e => {
@@ -58,8 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         .finally(() => setLoading(false));
     }, 300);
     return () => {
-      clearTimeout(timer);
-      controller.abort();
+      clearTimeout(to);
+      ctl.abort();
     };
   }, [term]);
 
@@ -69,9 +84,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     onSelectEntreprise(e);
   };
 
+  const handleFilterClick = () => {
+    onFilterSearch({ naf, employeesCategory, radius });
+  };
+
   return (
     <aside className="sidebar">
-      {/* Recherche */}
+      {/* Recherche texte */}
       <div className="search-container">
         <h2>Recherche par nom, SIREN ou adresse</h2>
         <input
@@ -97,25 +116,62 @@ const Sidebar: React.FC<SidebarProps> = ({
       {term.length >= 3 && suggestions.length > 0 && (
         <ul className="suggestions">
           {suggestions.map((e, i) => (
-            <li
-              key={e.siren + i}
-              onClick={() => handleSuggestionClick(e)}
-            >
+            <li key={e.siren + i} onClick={() => handleSuggestionClick(e)}>
               {e.name || '—'} — {e.siren} — {e.address}
             </li>
           ))}
         </ul>
       )}
       {term.length >= 3 && !loading && suggestions.length === 0 && (
-        <div className="no-results">Aucun résultat pour “{term}”</div>
+        <div className="no-results">Aucun résultat pour « {term} »</div>
       )}
-      
-      {/* Recherche 
-      <div className="search-container">
-        <h2>Rechercher par catégorie</h2>
-        {TODO : Ici intégrer une liste simplifiées des codes NAF, un slider pour le rayon de 5 à 50 km sur la carte, et un bouton de recherche
-        Cette recherche va donc récupérer toutes les entreprises correspondant à la catégorie large d'un code naf dans le rayon donné autour du centre posé par l'utilisateur sur la carte.}
-      </div>*/}
+
+      {/* Recherche par filtres */}
+      <div className="filters">
+        <h2>Recherche par catégorie</h2>
+
+        <label>Code NAF</label>
+        <select
+          value={naf}
+          onChange={e => setNaf(e.target.value)}
+        >
+          <option value="">-- Tous --</option>
+          <option value="47.11">47.11 – Commerce de détail de produits alimentaires</option>
+          <option value="45.20">45.20 – Entretien et réparation de véhicules automobiles</option>
+          <option value="62.01">62.01 – Programmation informatique</option>
+          {/* Ajoute tes principales catégories ici */}
+        </select>
+
+        <label>Effectifs</label>
+        <select
+          value={employeesCategory}
+          onChange={e => setEmployeesCategory(e.target.value)}
+        >
+          <option value="">-- Tous --</option>
+          <option value="1-9">1–9</option>
+          <option value="10-49">10–49</option>
+          <option value="50-99">50–99</option>
+          <option value="100+">100+</option>
+        </select>
+
+        <label>
+          Rayon : {radius} km
+          <input
+            type="range"
+            min={5}
+            max={50}
+            value={radius}
+            onChange={e => setRadius(+e.target.value)}
+          />
+        </label>
+
+        <button
+          className="btn-primary"
+          onClick={handleFilterClick}
+        >
+          Lancer la recherche
+        </button>
+      </div>
 
       {/* Mes clients & prospects */}
       <div className="user-list">

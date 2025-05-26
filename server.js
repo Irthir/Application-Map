@@ -1,7 +1,9 @@
+
 // server.js
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import fetch from 'node-fetch';               // n'oublie pas d'installer node-fetch
 import { BigQuery } from '@google-cloud/bigquery';
 
 const app = express();
@@ -13,34 +15,33 @@ app.use(express.json());
 // --- CONFIG MAPBOX GEOCODING ---
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJjbTc0aTR0aGcwYTJqMnFxeWdnN2N1NTRiIn0.UA9uEMwBO-JpQAkiutk_lg';
 if (!MAPBOX_TOKEN) {
-  console.warn('⚠️  MAPBOX_TOKEN non défini dans .env – la géolocalisation par adresse ne fonctionnera pas');
+  console.warn('⚠️ MAPBOX_TOKEN non défini – la géolocalisation par adresse tombera toujours sur Paris');
 }
-// Simple cache en mémoire : address → [lng, lat]
-const geoCache = new Map();
+const geoCache = new Map(); // address → [lng, lat]
 
-// Géocode une adresse via Mapbox si nécessaire
 async function ensureCoords(e) {
+  // si ce n'est pas la paire par défaut, on ne touche pas
   const [lng0, lat0] = e.position;
-  // Ne toucher que si c'est la paire Paris par défaut
   if (!(lng0 === 2.3522 && lat0 === 48.8566) || !e.address) {
     return e;
   }
-  // Si déjà en cache
+  // cache
   if (geoCache.has(e.address)) {
     return { ...e, position: geoCache.get(e.address) };
   }
-  // Appel Mapbox
+  // appel Mapbox
   try {
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/` +
                 `${encodeURIComponent(e.address)}.json?` +
                 `access_token=${MAPBOX_TOKEN}&limit=1`;
     const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Mapbox ${resp.status}`);
-    const js = await resp.json();
-    if (js.features && js.features.length > 0) {
-      const [lng, lat] = js.features[0].center;
-      geoCache.set(e.address, [lng, lat]);
-      return { ...e, position: [lng, lat] };
+    if (resp.ok) {
+      const js = await resp.json();
+      if (js.features && js.features.length > 0) {
+        const [lng, lat] = js.features[0].center;
+        geoCache.set(e.address, [lng, lat]);
+        return { ...e, position: [lng, lat] };
+      }
     }
   } catch (err) {
     console.warn('Geocoding failed for', e.address, err.message);
@@ -49,14 +50,12 @@ async function ensureCoords(e) {
 }
 
 // --- BigQuery setup ---
-const bq = new BigQuery({
-  projectId: process.env.GCP_PROJECT_ID,
-});
+const bq = new BigQuery({ projectId: process.env.GCP_PROJECT_ID });
 const TABLE_ID = '`application-map-458717.sirene_data.merged_sirene`';
 
-// Filtre les entreprises incomplètes
+// filtre les entreprises incomplètes
 function isCompleteEntreprise(e) {
-  if (!e.name || !e.name.trim()) return false;
+  if (!e.name?.trim()) return false;
   if (!e.employeesCategory) return false;
   if (!Array.isArray(e.position) || e.position.length !== 2) return false;
   const [lng, lat] = e.position;
@@ -64,9 +63,14 @@ function isCompleteEntreprise(e) {
       && !Number.isNaN(lng) && !Number.isNaN(lat);
 }
 
-// --- ROUTES ---
+// utilitaire pour parser la position issue de BigQuery
+function parsePosition(raw) {
+  const str = String(raw);
+  const [lng, lat] = str.replace(/[\[\]\s]/g, '').split(',').map(Number);
+  return [lng, lat];
+}
 
-// GET /api/all
+// GET /api/all — renvoie toutes les entreprises complètes, géolocalisées
 app.get('/api/all', async (_req, res) => {
   try {
     const query = `
@@ -76,13 +80,8 @@ app.get('/api/all', async (_req, res) => {
     const [job] = await bq.createQueryJob({ query });
     const [rows] = await job.getQueryResults();
 
-    // Parse, filtre et geocode si besoin
     const parsed = rows
-      .map(e => {
-        const str = String(e.position);
-        const [lng, lat] = str.replace(/[\[\]\s]/g, '').split(',').map(Number);
-        return { ...e, position: [lng, lat] };
-      })
+      .map(e => ({ ...e, position: parsePosition(e.position) }))
       .filter(isCompleteEntreprise);
 
     const enriched = await Promise.all(parsed.map(ensureCoords));
@@ -93,10 +92,11 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
-// GET /api/search?term=…
+// GET /api/search?term=… — renvoie jusqu’à 5 suggestions, géolocalisées
 app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
+
   try {
     const query = `
       SELECT siren, name, codeNAF, employeesCategory, address, position
@@ -117,11 +117,7 @@ app.get('/api/search', async (req, res) => {
     const [rows] = await job.getQueryResults();
 
     const parsed = rows
-      .map(e => {
-        const str = String(e.position);
-        const [lng, lat] = str.replace(/[\[\]\s]/g, '').split(',').map(Number);
-        return { ...e, position: [lng, lat] };
-      })
+      .map(e => ({ ...e, position: parsePosition(e.position) }))
       .filter(isCompleteEntreprise);
 
     const enriched = await Promise.all(parsed.map(ensureCoords));

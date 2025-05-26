@@ -19,7 +19,6 @@ const App: React.FC = () => {
 
   // 1) Sélection dans la FloatingPanel → ajoute à la recherche et au map
   const handleSelectEntreprise = (e: Entreprise) => {
-    console.log('ENTREPRISE position:', e.position);
     setCenter(e.position);
     setSearchHistory(prev =>
       prev.some(x => x.siren === e.siren) ? prev : [...prev, e]
@@ -86,6 +85,49 @@ const App: React.FC = () => {
     setCenter([lng, lat]);
   };
 
+  // Nouvelle recherche par filtres (NAF, effectifs, rayon)
+  const handleFilterSearch = async (filters: {
+    naf: string;
+    employeesCategory: string;
+    radius: number;
+  }) => {
+    const { naf, employeesCategory, radius } = filters;
+    // On passe aussi le centre actuel pour la requête spatiale
+    const [lng, lat] = center;
+    try {
+      const params = new URLSearchParams({
+        naf,
+        employeesCategory,
+        radius: radius.toString(),
+        lat: lat.toString(),
+        lng: lng.toString(),
+      });
+      const res = await fetch(`https://application-map.onrender.com/api/searchCategory?${params}`);
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const rows: Entreprise[] = await res.json();
+      // parser positions si besoin
+      const parsed = rows.map(e => {
+        if (typeof e.position === 'string') {
+          const [plng, plat] = (e.position as string)
+            .replace(/[\[\]\s]/g, '')
+            .split(',')
+            .map(Number);
+          return { ...e, position: [plng, plat] as [number, number] };
+        }
+        return e;
+      });
+      // on ajoute ces résultats à searchHistory et mapData
+      setSearchHistory(prev =>
+        [...prev, ...parsed.filter(e => !prev.some(x => x.siren === e.siren))]
+      );
+      setMapData(prev =>
+        [...prev, ...parsed.filter(e => !prev.some(x => x.siren === e.siren))]
+      );
+    } catch (err) {
+      console.error('Recherche par filtres échouée :', err);
+    }
+  };
+
   return (
     <div className="app">
       <Sidebar
@@ -94,6 +136,7 @@ const App: React.FC = () => {
         onClassify={handleUserClassify}
         onLocate={handleLocate}
         onRemove={handleUserRemove}
+        onFilterSearch={handleFilterSearch}   // ← nouveau
       />
 
       <div className="main">
