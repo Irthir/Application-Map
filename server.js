@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 // --- CONFIG MAPBOX GEOCODING ---
-const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN;
+const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJjbTc0aTR0aGcwYTJqMnFxeWdnN2N1NTRiIn0.UA9uEMwBO-JpQAkiutk_lg';
 if (!MAPBOX_TOKEN) {
   console.warn('⚠️  MAPBOX_TOKEN non défini dans .env – la géolocalisation par adresse ne fonctionnera pas');
 }
