@@ -92,7 +92,6 @@ const App: React.FC = () => {
     radius: number;
   }) => {
     const { naf, employeesCategory, radius } = filters;
-    // Construire les params, en incluant le centre actuel de la carte
     const params = new URLSearchParams({
       naf,
       employeesCategory,
@@ -100,13 +99,14 @@ const App: React.FC = () => {
       lng: center[0].toString(),
       lat: center[1].toString(),
     });
+
     try {
       const res = await fetch(
         `https://application-map.onrender.com/api/search-filters?${params}`
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const rows: Entreprise[] = await res.json();
-      // Remplace l'historique de recherche et les marqueurs par ces résultats
+      // On remplace l'historique et les marqueurs par ces résultats filtrés
       setSearchHistory(rows);
       setMapData(rows);
     } catch (err) {
