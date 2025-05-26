@@ -36,10 +36,21 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
     });
   }, [onClickSetCenter]);
 
-  // 2️⃣ Vol vers le centre
+  // 2️⃣ À chaque fois que `center` change, on recentre vraiment
   useEffect(() => {
     if (!map.current) return;
-    map.current.flyTo({ center, essential: true });
+
+    console.log('Recentrage demandé sur :', center);
+
+    // si le style est déjà chargé on peut voler  
+    if (map.current.isStyleLoaded()) {
+      map.current.flyTo({ center, essential: true });
+    } else {
+      // sinon on attend le chargement complet avant de voler
+      map.current.once('style.load', () => {
+        map.current!.flyTo({ center, essential: true });
+      });
+    }
   }, [center]);
 
   // 3️⃣ Marqueurs
@@ -50,7 +61,8 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
     data.forEach(e => {
       const color =
         e.type === EntrepriseType.Client   ? '#10B981' :
-        e.type === EntrepriseType.Prospect ? '#F59E0B' : '#6B7280';
+        e.type === EntrepriseType.Prospect ? '#F59E0B' :
+        '#6B7280';
       const marker = new mapboxgl.Marker({ color })
         .setLngLat(e.position)
         .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
