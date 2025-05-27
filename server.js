@@ -144,7 +144,7 @@ app.get('/api/search-filters', async (req, res) => {
           employeesCategory = @emp
           OR employeesCategory IS NULL
         )
-      LIMIT 10000
+      LIMIT 1000
     `;
     const options = {
       query,
