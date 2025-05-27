@@ -140,8 +140,11 @@ app.get('/api/search-filters', async (req, res) => {
       SELECT siren, name, codeNAF, employeesCategory, address, position
       FROM ${TABLE_ID}
       WHERE codeNAF LIKE @naf
-        AND employeesCategory = @emp
-      LIMIT 1000
+        AND (
+          employeesCategory = @emp
+          OR employeesCategory IS NULL
+        )
+      LIMIT 100000
     `;
     const options = {
       query,
@@ -153,8 +156,13 @@ app.get('/api/search-filters', async (req, res) => {
     const [job] = await bq.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
+    // On réinjecte la valeur du filtre pour les NULL
     const parsed = rows
-      .map(e => ({ ...e, position: parsePosition(e.position) }))
+      .map(e => ({
+        ...e,
+        position: parsePosition(e.position),
+        employeesCategory: e.employeesCategory || empRaw
+      }))
       .filter(isCompleteEntreprise);
 
     const enriched = await Promise.all(parsed.map(ensureCoords));
@@ -165,6 +173,7 @@ app.get('/api/search-filters', async (req, res) => {
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
 });
+
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
