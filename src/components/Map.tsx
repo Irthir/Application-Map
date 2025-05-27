@@ -3,7 +3,7 @@ import React, { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Entreprise, EntrepriseType } from '../type.ts';
+import { Entreprise, EntrepriseType } from '../type';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_KEY || '';
 
@@ -36,24 +36,37 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
     });
   }, [onClickSetCenter]);
 
-  // 2️⃣ À chaque fois que `center` change, on recentre vraiment
+  // 2️⃣ Recentrage
   useEffect(() => {
     if (!map.current) return;
-
-    console.log('Recentrage demandé sur :', center);
-
-    // si le style est déjà chargé on peut voler  
-    if (map.current.isStyleLoaded()) {
-      map.current.flyTo({ center, essential: true });
-    } else {
-      // sinon on attend le chargement complet avant de voler
-      map.current.once('style.load', () => {
-        map.current!.flyTo({ center, essential: true });
-      });
-    }
+    const fly = () => map.current!.flyTo({ center, essential: true });
+    map.current.isStyleLoaded() ? fly() : map.current.once('style.load', fly);
   }, [center]);
 
-  // 3️⃣ Marqueurs
+  // 3️⃣ Cercle de filtre
+  useEffect(() => {
+    if (!map.current) return;
+    const sourceId = 'search-radius-circle';
+    const drawCircle = () => {
+      const circleGeo = turf.circle(center, filterRadius, { steps: 64, units: 'kilometers' });
+      const source = map.current!.getSource(sourceId) as mapboxgl.GeoJSONSource;
+      if (source) {
+        source.setData(circleGeo);
+      } else {
+        map.current!
+          .addSource(sourceId, { type: 'geojson', data: circleGeo })
+          .addLayer({
+            id: sourceId,
+            type: 'fill',
+            source: sourceId,
+            paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.2 },
+          });
+      }
+    };
+    map.current.isStyleLoaded() ? drawCircle() : map.current.once('style.load', drawCircle);
+  }, [center, filterRadius]);
+
+  // 4️⃣ Marqueurs
   useEffect(() => {
     if (!map.current) return;
     markers.current.forEach(m => m.remove());
@@ -63,47 +76,22 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
         e.type === EntrepriseType.Client   ? '#10B981' :
         e.type === EntrepriseType.Prospect ? '#F59E0B' :
         '#6B7280';
-      const marker = new mapboxgl.Marker({ color })
+      const m = new mapboxgl.Marker({ color })
         .setLngLat(e.position)
-        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
-          <div style="font-size:14px;line-height:1.3">
-            <strong>${e.name}</strong><br/>
-            Type : ${e.type}<br/>
-            NAF : ${e.codeNAF}<br/>
-            SIREN : ${e.siren}
-          </div>
-        `))
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 }).setHTML(
+            `<div style="font-size:14px;line-height:1.3">
+              <strong>${e.name}</strong><br/>
+              Type : ${e.type}<br/>
+              NAF : ${e.codeNAF}<br/>
+              SIREN : ${e.siren}
+            </div>`
+          )
+        )
         .addTo(map.current!);
-      markers.current.push(marker);
+      markers.current.push(m);
     });
   }, [data]);
-
-  // 4️⃣ Cercle de filtre (avec attente du style)
-  useEffect(() => {
-    if (!map.current) return;
-    const sourceId = 'search-radius-circle';
-    const draw = () => {
-      const circle = turf.circle(center, filterRadius, { steps: 64, units: 'kilometers' });
-      if (map.current!.getSource(sourceId)) {
-        (map.current!.getSource(sourceId) as mapboxgl.GeoJSONSource).setData(circle);
-      } else {
-        map.current!
-          .addSource(sourceId, { type: 'geojson', data: circle })
-          .addLayer({
-            id: sourceId,
-            type: 'fill',
-            source: sourceId,
-            paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.2 }
-          });
-      }
-    };
-
-    if (map.current.isStyleLoaded()) {
-      draw();
-    } else {
-      map.current.once('style.load', draw);
-    }
-  }, [center, filterRadius]);
 
   return <div ref={mapContainer} className="mapbox-container" />;
 };

@@ -1,7 +1,18 @@
 // src/components/Sidebar.tsx
 import React, { useState, useEffect } from 'react';
-import { Entreprise, EntrepriseType } from '../type.ts';
-import nafCodes from '../data/naf-codes.json';
+import nafTree from '../data/naf-tree.json';
+import { Entreprise, EntrepriseType } from '../type';
+
+interface Activity {
+  id: string;
+  label: string;
+}
+
+interface Division {
+  id: string;
+  label: string;
+  children: Activity[];
+}
 
 interface SidebarProps {
   data: Entreprise[];
@@ -9,15 +20,15 @@ interface SidebarProps {
   onClassify: (e: Entreprise, newType: EntrepriseType) => void;
   onLocate: (e: Entreprise) => void;
   onRemove: (e: Entreprise) => void;
-  /** Recherche par filtres (NAF, effectifs, rayon) */
-  onFilterSearch: (filters: {
-    naf: string;
-    employeesCategory: string;
-    radius: number;
-  }) => void;
+  radius: number;
+  onRadiusChange: (r: number) => void;
+  onFilterSearch: (filters: { activityId: string; employeesCategory: string; radius: number }) => Promise<void>;
 }
 
-const employeeBuckets = ['1-9', '10-49', '50-99', '100+'];
+const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+'];
+
+const normalizeText = (str: string) =>
+  str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 const Sidebar: React.FC<SidebarProps> = ({
   data,
@@ -25,196 +36,176 @@ const Sidebar: React.FC<SidebarProps> = ({
   onClassify,
   onLocate,
   onRemove,
-  onFilterSearch
+  radius,
+  onRadiusChange,
+  onFilterSearch,
 }) => {
-  // recherche texte
-  const [searchTerm, setSearchTerm] = useState('');
+  // Loading state for filter search
+  const [filterLoading, setFilterLoading] = useState(false);
+
+  // Recherche textuelle d'entreprise
+  const [searchText, setSearchText] = useState('');
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // filtres
-  const [naf, setNaf] = useState(''); 
-  const [employeesCategory, setEmployeesCategory] = useState('');
-  const [radius, setRadius] = useState(20);
-
-  const term = searchTerm.trim();
-
-  // effet recherche texte
   useEffect(() => {
-    if (term.length < 3) {
+    if (!searchText) {
       setSuggestions([]);
-      setLoading(false);
       return;
     }
-    const ctl = new AbortController();
-    const to = setTimeout(() => {
-      setLoading(true);
-      fetch(
-        `https://application-map.onrender.com/api/search?term=${encodeURIComponent(term)}`,
-        { signal: ctl.signal }
-      )
-        .then(r => {
-          if (!r.ok) throw new Error(r.status.toString());
-          return r.json();
-        })
-        .then((rows: Entreprise[]) => {
-          const parsed = rows.map(e => {
-            if (typeof e.position === 'string') {
-              const [lng, lat] = (e.position as string)
-                .replace(/[\[\]\s]/g, '')
-                .split(',')
-                .map(Number);
-              return { ...e, position: [lng, lat] as [number, number] };
-            }
-            return e;
-          });
-          setSuggestions(parsed);
-        })
-        .catch(err => {
-          if (err.name !== 'AbortError') setSuggestions([]);
-        })
-        .finally(() => setLoading(false));
-    }, 300);
+    setLoading(true);
+    fetch(
+      `https://application-map.onrender.com/api/search?term=${encodeURIComponent(
+        searchText
+      )}`
+    )
+      .then(res => res.json())
+      .then((res: Entreprise[]) => {
+        setSuggestions(res);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [searchText]);
 
-    return () => {
-      clearTimeout(to);
-      ctl.abort();
-    };
-  }, [term]);
-
-  const handleSuggestionClick = (e: Entreprise) => {
+  const handleSearchSelect = (e: Entreprise) => {
+    setSearchText('');
     setSuggestions([]);
-    setSearchTerm('');
     onSelectEntreprise(e);
   };
 
-  const handleFilterClick = () => {
-    onFilterSearch({ naf, employeesCategory, radius });
+  // Recherche NAF / division
+  const [divisions] = useState<Division[]>(nafTree as Division[]);
+  const [nafSearch, setNafSearch] = useState('');
+  const [selectedActivity, setSelectedActivity] = useState('');
+  const [employeesCategory, setEmployeesCategory] = useState(employeeBuckets[0]);
+
+  const searchNorm = normalizeText(nafSearch);
+  const filteredDivs = divisions
+    .map(div => {
+      if (!nafSearch) return div;
+      const divNorm = normalizeText(div.label);
+      const divMatches = divNorm.includes(searchNorm);
+      const childMatches = div.children.filter(act =>
+        normalizeText(act.label).includes(searchNorm)
+      );
+      if (divMatches) return div;
+      if (childMatches.length) return { ...div, children: childMatches };
+      return null;
+    })
+    .filter((d): d is Division => d !== null);
+
+  const handleFilterClick = async () => {
+    console.log('Filtres envoyés →', {
+      activityId: selectedActivity,
+      employeesCategory,
+      radius
+    });
+    setFilterLoading(true);
+    try {
+      await onFilterSearch({ activityId: selectedActivity, employeesCategory, radius });
+    } catch (err) {
+      console.error('Erreur lors de la recherche par filtres :', err);
+    }
+    setFilterLoading(false);
   };
 
   return (
-    <aside className="sidebar">
-      {/* Recherche texte */}
+    <div className="sidebar">
+      {/* Recherche entreprise */}
+      <h2>Rechercher</h2>
       <div className="search-container">
-        <h2>Recherche par nom, SIREN ou adresse</h2>
         <input
-          type="text"
           className="search"
-          placeholder="Rechercher par nom, SIREN ou adresse"
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
+          type="text"
+          placeholder="Nom, SIREN, adresse..."
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
         />
-        {suggestions.length > 0 && (
-          <button
-            className="clear-suggestions"
-            onClick={() => setSuggestions([])}
-            aria-label="Fermer la liste"
-          >
-            ×
-          </button>
+        {searchText && (
+          <button className="clear-suggestions" onClick={() => setSearchText('')}>×</button>
         )}
         {loading && <div className="loading">Chargement...</div>}
-        {term.length >= 3 && suggestions.length > 0 && (
+        {suggestions.length > 0 && (
           <ul className="suggestions">
-            {suggestions.map((e, i) => (
-              <li key={e.siren + i} onClick={() => handleSuggestionClick(e)}>
-                {e.name || '—'} — {e.siren} — {e.address}
+            {suggestions.map(s => (
+              <li key={s.siren} onClick={() => handleSearchSelect(s)}>
+                <div className="name">{s.name}</div>
+                <div className="address">{s.address}</div>
               </li>
             ))}
           </ul>
         )}
-        {term.length >= 3 && !loading && suggestions.length === 0 && (
-          <div className="no-results">Aucun résultat pour « {term} »</div>
-        )}
-      </div>
+      </div> {/* Fin search-container */}
 
-      {/* Recherche par filtres */}
+      {/* Filtres */}
+      <h2>Rechercher par catégorie</h2>
       <div className="filters">
-        <h2>Recherche par catégorie</h2>
-
-        <label>Code NAF</label>
-        <select value={naf} onChange={e => setNaf(e.target.value)}>
-          {nafCodes.map(code => (
-            <option key={code.id} value={code.id}>
-              {code.id} — {code.label}
-            </option>
-          ))}
-        </select>
-
-        <label>Effectifs</label>
-        <select
-          value={employeesCategory}
-          onChange={e => setEmployeesCategory(e.target.value)}
-        >
-          {employeeBuckets.map(bucket => (
-            <option key={bucket} value={bucket}>
-              {bucket}
-            </option>
-          ))}
-        </select>
-
-        <label>
-          Rayon : {radius} km
+        <div className="filter-group">
+          <label>Activités</label>
+          <input
+            type="text"
+            placeholder="Filtre d'activités.."
+            value={nafSearch}
+            onChange={e => setNafSearch(e.target.value)}
+            className="search"
+          />
+          <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)}>
+            <option value="">-- Sélectionner --</option>
+            {filteredDivs.map(div => (
+              <optgroup key={div.id} label={div.label}>
+                {div.children.map(act => (
+                  <option key={act.id} value={act.id}>{act.label}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div className="filter-group">
+          <label>Effectifs</label>
+          <select value={employeesCategory} onChange={e => setEmployeesCategory(e.target.value)}>
+            {employeeBuckets.map(bucket => (
+              <option key={bucket} value={bucket}>{bucket}</option>
+            ))}
+          </select>
+        </div>
+        <div className="slider-group">
+          <span>Rayon : {radius} km</span>
           <input
             type="range"
             min={5}
             max={50}
             value={radius}
-            onChange={e => setRadius(+e.target.value)}
+            onChange={e => onRadiusChange(Number(e.target.value))}
           />
-        </label>
-
-        <button className="btn-primary" onClick={handleFilterClick}>
-          Lancer la recherche
+        </div>
+        <button
+          className="btn-primary"
+          onClick={handleFilterClick}
+          disabled={!selectedActivity || filterLoading}
+        >
+          {filterLoading ? 'Recherche...' : 'Lancer la recherche'}
         </button>
       </div>
 
-      {/* Mes clients & prospects */}
+      {/* Liste des entreprises */}
       <div className="user-list">
-        <h2>Mes clients &amp; prospects</h2>
-        {data.length === 0 ? (
-          <div className="empty">Aucune entreprise ajoutée.</div>
-        ) : (
-          data.map((e, i) => (
-            <div key={e.siren + i} className="user-item">
-              <div>
-                <strong>{e.name || '—'}</strong><br />
-                <small>{e.address}</small>
-              </div>
-              <div className="user-actions">
-                <button
-                  className="btn-sm"
-                  onClick={() =>
-                    onClassify(
-                      e,
-                      e.type === EntrepriseType.Client
-                        ? EntrepriseType.Prospect
-                        : EntrepriseType.Client
-                    )
-                  }
-                >
-                  {e.type === EntrepriseType.Client ? 'Prospect' : 'Client'}
-                </button>
-                <button
-                  className="icon-btn"
-                  title="Localiser"
-                  onClick={() => onLocate(e)}
-                >
-                  📍
-                </button>
-                <button
-                  className="icon-btn"
-                  title="Supprimer"
-                  onClick={() => onRemove(e)}
-                >
-                  ❌
-                </button>
-              </div>
+        <h2>Résultats</h2>
+        {data.map(e => (
+          <div key={e.siren} className="user-item">
+            <div className="user-info">
+              <div className="name">{e.name}</div>
+              <div className="address">{e.address}</div>
             </div>
-          ))
-        )}
+            <div className="user-actions">
+              <button className="btn-sm" onClick={() => onLocate(e)}>📍</button>
+              <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Client)}>✓</button>
+              <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Prospect)}>?</button>
+              <button className="icon-btn" onClick={() => onRemove(e)}>🗑️</button>
+            </div>
+          </div>
+        ))}
       </div>
-    </aside>
+    </div>
   );
 };
 

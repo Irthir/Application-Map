@@ -126,72 +126,9 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// server.js
-// … tes imports et setup existants …
-
-// GET /api/filter?naf=…&employeesCategory=…&radius=…&centerLng=…&centerLat=…
-app.get('/api/filter', async (req, res) => {
-  const { naf, employeesCategory, radius, centerLng, centerLat } = req.query;
-  if (!naf || !employeesCategory || !radius || !centerLng || !centerLat) {
-    return res.status(400).json({ error: 'Paramètres manquants.' });
-  }
-
-  const rad = Number(radius);
-  const lng = Number(centerLng);
-  const lat = Number(centerLat);
-  try {
-    // On présume que ta colonne `position` est un STRING "[lng,lat]"
-    // et que tu stockes un GEOGRAPHY ou tu peux faire ST_GEOGPOINT(lng,lat)
-    const query = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
-      FROM ${TABLE_ID}
-      WHERE codeNAF = @naf
-        AND employeesCategory = @employeesCategory
-        AND ST_DWithin(
-            ST_GeogPoint(@lng, @lat),
-            ST_GeogFromText(
-              CONCAT('POINT(', 
-                SPLIT(REPLACE(position,'[',''),',')[OFFSET(0)], ' ',
-                SPLIT(REPLACE(position,'[',''),',')[OFFSET(1)], ')'
-              )
-            ),
-            @radius_m
-        )
-    `;
-    const options = {
-      query,
-      params: {
-        naf: String(naf),
-        employeesCategory: String(employeesCategory),
-        lng,
-        lat,
-        radius_m: rad * 1000
-      }
-    };
-    const [job] = await bq.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
-    // parser + geocode comme d’habitude…
-    const parsed = rows.map(e => {
-      const [l0, l1] = String(e.position)
-        .replace(/[\[\]\s]/g,'')
-        .split(',')
-        .map(Number);
-      return { ...e, position: [l0, l1] };
-    }).filter(isCompleteEntreprise);
-
-    const enriched = await Promise.all(parsed.map(ensureCoords));
-    res.json(enriched);
-
-  } catch (err) {
-    console.error('BigQuery /filter error:', err);
-    res.status(500).json({ error: 'Erreur interne BigQuery' });
-  }
-});
-
-
 // GET /api/search-filters?naf=…&employeesCategory=… — recherche par filtres
 app.get('/api/search-filters', async (req, res) => {
+  console.log('📬 search-filters reçu avec params', req.query);
   const nafRaw = String(req.query.naf || '').trim();
   const empRaw = String(req.query.employeesCategory || '').trim();
   if (!nafRaw || !empRaw) {
@@ -204,7 +141,7 @@ app.get('/api/search-filters', async (req, res) => {
       FROM ${TABLE_ID}
       WHERE codeNAF LIKE @naf
         AND employeesCategory = @emp
-      LIMIT 100
+      LIMIT 1000
     `;
     const options = {
       query,
@@ -221,6 +158,7 @@ app.get('/api/search-filters', async (req, res) => {
       .filter(isCompleteEntreprise);
 
     const enriched = await Promise.all(parsed.map(ensureCoords));
+    console.log('🔎 Résultats BigQuery:', enriched.length, 'entrées');
     res.json(enriched);
   } catch (err) {
     console.error('BigQuery /search-filters error:', err);

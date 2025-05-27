@@ -255,3 +255,22 @@ body {
   justify-content: space-between;
   align-items: center;
 }
+
+.filter-group .search {
+  margin-bottom: 8px;
+}
+
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.slider-group span {
+  margin-bottom: 4px;
+}
+.slider-group input {
+  width: 100%;
+}
+.filter-group select optgroup {
+  font-weight: 600;
+}
