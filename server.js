@@ -149,25 +149,27 @@ app.get('/api/search-filters', async (req, res) => {
         employeesCategory,
         address,
         position,
+        lon,
+        lat,
         (
           6371 * ACOS(
             COS(@lat * 3.141592653589793 / 180)
-            * COS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * 3.141592653589793 / 180)
-            * COS((CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64) - @lng) * 3.141592653589793 / 180)
+            * COS(lat * 3.141592653589793 / 180)
+            * COS((lon - @lng) * 3.141592653589793 / 180)
             + SIN(@lat * 3.141592653589793 / 180)
-            * SIN(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * 3.141592653589793 / 180)
+            * SIN(lat * 3.141592653589793 / 180)
           )
         ) AS distance_km
-      FROM application-map-458717.sirene_data.merged_sirene
+      FROM application-map-458717.sirene_data.entreprises_fusion_final
       WHERE codeNAF LIKE @naf
         AND (employeesCategory = @emp OR employeesCategory IS NULL)
         AND (
           6371 * ACOS(
             COS(@lat * 3.141592653589793 / 180)
-            * COS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * 3.141592653589793 / 180)
-            * COS((CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64) - @lng) * 3.141592653589793 / 180)
+            * COS(lat * 3.141592653589793 / 180)
+            * COS((lon - @lng) * 3.141592653589793 / 180)
             + SIN(@lat * 3.141592653589793 / 180)
-            * SIN(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * 3.141592653589793 / 180)
+            * SIN(lat * 3.141592653589793 / 180)
           ) <= @radius
         )
       LIMIT 1000
