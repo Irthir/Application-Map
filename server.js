@@ -149,27 +149,25 @@ app.get('/api/search-filters', async (req, res) => {
         employeesCategory,
         address,
         position,
-        -- Distance en km entre la cible et l'entreprise
         (
           6371 * ACOS(
-            COS(RADIANS(@lat))
-            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
-            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RADIANS(@lng))
-            + SIN(RADIANS(@lat))
-            * SIN(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            COS(RAD(@lat))
+            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RAD(@lng))
+            + SIN(RAD(@lat))
+            * SIN(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
           )
         ) AS distance_km
       FROM ${TABLE_ID}
       WHERE codeNAF LIKE @naf
         AND (employeesCategory = @emp OR employeesCategory IS NULL)
         AND (
-          -- Haversine: distance <= rayon demandé
           6371 * ACOS(
-            COS(RADIANS(@lat))
-            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
-            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RADIANS(@lng))
-            + SIN(RADIANS(@lat))
-            * SIN(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            COS(RAD(@lat))
+            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RAD(@lng))
+            + SIN(RAD(@lat))
+            * SIN(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
           ) <= @radius
         )
       LIMIT 1000
