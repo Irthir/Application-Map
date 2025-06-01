@@ -151,11 +151,11 @@ app.get('/api/search-filters', async (req, res) => {
         position,
         (
           6371 * ACOS(
-            COS(RAD(@lat))
-            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
-            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RAD(@lng))
-            + SIN(RAD(@lat))
-            * SIN(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            COS(@lat * PI() / 180)
+            * COS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * PI() / 180)
+            * COS((CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64) - @lng) * PI() / 180)
+            + SIN(@lat * PI() / 180)
+            * SIN(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * PI() / 180)
           )
         ) AS distance_km
       FROM ${TABLE_ID}
@@ -163,11 +163,11 @@ app.get('/api/search-filters', async (req, res) => {
         AND (employeesCategory = @emp OR employeesCategory IS NULL)
         AND (
           6371 * ACOS(
-            COS(RAD(@lat))
-            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
-            * COS(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RAD(@lng))
-            + SIN(RAD(@lat))
-            * SIN(RAD(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            COS(@lat * PI() / 180)
+            * COS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * PI() / 180)
+            * COS((CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64) - @lng) * PI() / 180)
+            + SIN(@lat * PI() / 180)
+            * SIN(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * PI() / 180)
           ) <= @radius
         )
       LIMIT 1000
