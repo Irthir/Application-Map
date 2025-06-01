@@ -12,7 +12,7 @@ interface SidebarProps {
   onClassify: (e: Entreprise, newType: EntrepriseType) => void;
   onLocate: (e: Entreprise) => void;
   onRemove: (e: Entreprise) => void;
-  onSearchSimilar: (e: Entreprise) => void; // Ajouté ici
+  onSearchSimilar: (e: Entreprise) => void;
   radius: number;
   onRadiusChange: (r: number) => void;
   onFilterSearch: (filters: { activityId: string; employeesCategory: string; radius: number }) => Promise<void>;
@@ -127,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div className="sidebar">
+    <div className="sidebar" style={{ height: "100vh", overflowY: "auto" }}>
       <h2>Rechercher</h2>
       <div className="search-container">
         <input className="search" type="text" placeholder="Nom, SIREN, adresse..."
@@ -191,22 +191,27 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="name">{e.name}</div>
                 <div className="address">{e.address}</div>
               </div>
-              <div className="user-actions">
-                <button className="btn-sm" onClick={() => onLocate(e)}>📍</button>
-                {isClient
-                  ? <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Prospect)}>Prospect</button>
-                  : <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Client)}>Client</button>
-                }
-                <button className="icon-btn" onClick={() => onRemove(e)}>🗑️</button>
-                {/* BOUTON RECHERCHER SIMILAIRE */}
-                <button
-                  className="btn-sm"
-                  style={{ background: "#f59e42", color: "#fff", marginLeft: 8 }}
-                  title="Rechercher des entreprises similaires à celle-ci"
-                  onClick={() => onSearchSimilar(e)}
-                >
-                  Rechercher similaire
-                </button>
+              <div className="user-actions" style={{ width: "170px" }}>
+                {/* Première ligne : centrage et classification */}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
+                  <button className="btn-sm" onClick={() => onLocate(e)}>📍</button>
+                  {isClient
+                    ? <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Prospect)}>Prospect</button>
+                    : <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Client)}>Client</button>
+                  }
+                </div>
+                {/* Deuxième ligne : rechercher similaire + suppression */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button
+                    className="btn-sm"
+                    style={{ background: "#f59e42", color: "#fff", flex: 1 }}
+                    title="Rechercher des entreprises similaires à celle-ci"
+                    onClick={() => onSearchSimilar(e)}
+                  >
+                    Rechercher similaire
+                  </button>
+                  <button className="icon-btn" onClick={() => onRemove(e)}>🗑️</button>
+                </div>
               </div>
             </div>
           );

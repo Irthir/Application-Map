@@ -135,11 +135,10 @@ app.get('/api/search-filters', async (req, res) => {
   const lng = Number(req.query.lng);
   const lat = Number(req.query.lat);
 
-  if (!nafRaw || !empRaw || isNaN(lng) || isNaN(lat)) {
-    return res.status(400).json({ error: 'naf, employeesCategory, lng, lat sont requis' });
+  if (!nafRaw || isNaN(lng) || isNaN(lat)) {
+    return res.status(400).json({ error: 'naf, lng, lat sont requis' });
   }
 
-  // Filtre NAF et effectifs, puis filtre géographique
   try {
     const query = `
       SELECT
@@ -162,7 +161,10 @@ app.get('/api/search-filters', async (req, res) => {
         ) AS distance_km
       FROM application-map-458717.sirene_data.entreprises_fusion_final
       WHERE codeNAF LIKE @naf
-        AND (employeesCategory = @emp OR employeesCategory IS NULL)
+        AND (
+          @emp = "" OR
+          employeesCategory = @emp OR employeesCategory IS NULL
+        )
         AND (
           6371 * ACOS(
             COS(@lat * 3.141592653589793 / 180)
@@ -187,7 +189,6 @@ app.get('/api/search-filters', async (req, res) => {
     const [job] = await bq.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
-    // On réinjecte la valeur du filtre pour les NULL
     const parsed = rows
       .map(e => ({
         ...e,
@@ -204,54 +205,6 @@ app.get('/api/search-filters', async (req, res) => {
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
 });
-
-/*app.get('/api/search-filters', async (req, res) => {
-  console.log('📬 search-filters reçu avec params', req.query);
-  const nafRaw = String(req.query.naf || '').trim();
-  const empRaw = String(req.query.employeesCategory || '').trim();
-  if (!nafRaw || !empRaw) {
-    return res.status(400).json({ error: 'naf et employeesCategory sont requis' });
-  }
-
-  try {
-    const query = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
-      FROM ${TABLE_ID}
-      WHERE codeNAF LIKE @naf
-        AND (
-          employeesCategory = @emp
-          OR employeesCategory IS NULL
-        )
-      LIMIT 1000
-    `;
-    const options = {
-      query,
-      params: {
-        naf: `${nafRaw}%`,
-        emp: empRaw
-      }
-    };
-    const [job] = await bq.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
-    // On réinjecte la valeur du filtre pour les NULL
-    const parsed = rows
-      .map(e => ({
-        ...e,
-        position: parsePosition(e.position),
-        employeesCategory: e.employeesCategory || empRaw
-      }))
-      .filter(isCompleteEntreprise);
-
-    const enriched = await Promise.all(parsed.map(ensureCoords));
-    console.log('🔎 Résultats BigQuery:', enriched.length, 'entrées');
-    res.json(enriched);
-  } catch (err) {
-    console.error('BigQuery /search-filters error:', err);
-    res.status(500).json({ error: 'Erreur interne BigQuery' });
-  }
-});*/
-
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
