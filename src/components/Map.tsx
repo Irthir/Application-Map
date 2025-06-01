@@ -3,6 +3,8 @@ import React, { useRef, useEffect } from 'react';
 import mapboxgl from 'mapbox-gl';
 import * as turf from '@turf/turf';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import nafTree from '../data/naf-tree.json';
+import sectionLabels from '../data/naf-sections.json';
 import { Entreprise, EntrepriseType } from '../type';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_KEY || '';
@@ -14,12 +16,25 @@ interface MapProps {
   onClickSetCenter: (lat: number, lng: number) => void;
 }
 
+// Build lookups for NAF activity and section labels
+const buildNafLabelMap = () => {
+  const map: Record<string, string> = {};
+  (nafTree as any[]).forEach(div => {
+    div.children.forEach((act: any) => {
+      map[act.id] = act.label;
+    });
+  });
+  return map;
+};
+const nafLabelMap = buildNafLabelMap();
+
 const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const markers = useRef<mapboxgl.Marker[]>([]);
+  // store marker & related enterprise info
+  const markers = useRef<{ marker: mapboxgl.Marker; siren: string }[]>([]);
 
-  // 1️⃣ Initialisation de la carte
+  // initialize map
   useEffect(() => {
     if (map.current || !mapContainer.current) return;
     map.current = new mapboxgl.Map({
@@ -36,60 +51,90 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
     });
   }, [onClickSetCenter]);
 
-  // 2️⃣ Recentrage
+  // update center: fly and open popup if matching marker
   useEffect(() => {
     if (!map.current) return;
-    const fly = () => map.current!.flyTo({ center, essential: true });
+    const fly = () => {
+      map.current!.flyTo({ center, essential: true });
+      // after move, find marker at center
+      const found = markers.current.find(({ marker }) => {
+        const pos = marker.getLngLat();
+        return Math.abs(pos.lng - center[0]) < 1e-6 && Math.abs(pos.lat - center[1]) < 1e-6;
+      });
+      if (found) {
+        // open popup
+        const popup = found.marker.getPopup();
+        if (popup) {
+          popup.addTo(map.current!);
+        }
+      }
+    };
     map.current.isStyleLoaded() ? fly() : map.current.once('style.load', fly);
   }, [center]);
 
-  // 3️⃣ Cercle de filtre
+  // draw filter circle
   useEffect(() => {
     if (!map.current) return;
     const sourceId = 'search-radius-circle';
-    const drawCircle = () => {
-      const circleGeo = turf.circle(center, filterRadius, { steps: 64, units: 'kilometers' });
-      const source = map.current!.getSource(sourceId) as mapboxgl.GeoJSONSource;
-      if (source) {
-        source.setData(circleGeo);
+    const draw = () => {
+      const circle = turf.circle(center, filterRadius, { steps: 64, units: 'kilometers' });
+      const existing = map.current!.getSource(sourceId) as mapboxgl.GeoJSONSource;
+      if (existing) {
+        existing.setData(circle);
       } else {
         map.current!
-          .addSource(sourceId, { type: 'geojson', data: circleGeo })
-          .addLayer({
-            id: sourceId,
-            type: 'fill',
-            source: sourceId,
-            paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.2 },
-          });
+          .addSource(sourceId, { type: 'geojson', data: circle })
+          .addLayer({ id: sourceId, type: 'fill', source: sourceId,
+            paint: { 'fill-color': '#3B82F6', 'fill-opacity': 0.2 } });
       }
     };
-    map.current.isStyleLoaded() ? drawCircle() : map.current.once('style.load', drawCircle);
+    map.current.isStyleLoaded() ? draw() : map.current.once('style.load', draw);
   }, [center, filterRadius]);
 
-  // 4️⃣ Marqueurs
+  // update markers
   useEffect(() => {
     if (!map.current) return;
-    markers.current.forEach(m => m.remove());
+    // clear old
+    markers.current.forEach(({ marker }) => marker.remove());
     markers.current = [];
+
     data.forEach(e => {
       const color =
         e.type === EntrepriseType.Client   ? '#10B981' :
         e.type === EntrepriseType.Prospect ? '#F59E0B' :
         '#6B7280';
+      const typeLabel = e.type || 'Recherche';
+      const nafSectionKey = e.codeNAF.slice(0, 2);
+      const nafLabel = nafLabelMap[e.codeNAF] || sectionLabels[nafSectionKey as keyof typeof sectionLabels] || e.codeNAF;
+      let empCat = 'N/A';
+      if (e.employeesCategory) {
+        const num = Number(e.employeesCategory.replace(/\D/g, ''));
+        if (!isNaN(num)) {
+          if (num <= 10) empCat = '1-10';
+          else if (num <= 50) empCat = '11-50';
+          else if (num <= 200) empCat = '51-200';
+          else if (num <= 500) empCat = '201-500';
+          else empCat = '501+';
+        } else {
+          empCat = e.employeesCategory;
+        }
+      }
+      const addr = e.address || '';
+
+      const html = `<div style="font-size:14px;line-height:1.4">
+          <strong>${e.name}</strong><br/>
+          Type : ${typeLabel}<br/>
+          Catégorie : ${nafLabel}<br/>
+          SIREN : ${e.siren}<br/>
+          Employés : ${empCat}<br/>
+          Adresse : ${addr}
+        </div>`;
+
       const m = new mapboxgl.Marker({ color })
         .setLngLat(e.position)
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<div style="font-size:14px;line-height:1.3">
-              <strong>${e.name}</strong><br/>
-              Type : ${e.type}<br/>
-              NAF : ${e.codeNAF}<br/>
-              SIREN : ${e.siren}
-            </div>`
-          )
-        )
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(html))
         .addTo(map.current!);
-      markers.current.push(m);
+      markers.current.push({ marker: m, siren: e.siren });
     });
   }, [data]);
 

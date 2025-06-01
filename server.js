@@ -131,6 +131,84 @@ app.get('/api/search-filters', async (req, res) => {
   console.log('📬 search-filters reçu avec params', req.query);
   const nafRaw = String(req.query.naf || '').trim();
   const empRaw = String(req.query.employeesCategory || '').trim();
+  const radius = Number(req.query.radius || 20);
+  const lng = Number(req.query.lng);
+  const lat = Number(req.query.lat);
+
+  if (!nafRaw || !empRaw || isNaN(lng) || isNaN(lat)) {
+    return res.status(400).json({ error: 'naf, employeesCategory, lng, lat sont requis' });
+  }
+
+  // Filtre NAF et effectifs, puis filtre géographique
+  try {
+    const query = `
+      SELECT
+        siren,
+        name,
+        codeNAF,
+        employeesCategory,
+        address,
+        position,
+        -- Distance en km entre la cible et l'entreprise
+        (
+          6371 * ACOS(
+            COS(RADIANS(@lat))
+            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RADIANS(@lng))
+            + SIN(RADIANS(@lat))
+            * SIN(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+          )
+        ) AS distance_km
+      FROM ${TABLE_ID}
+      WHERE codeNAF LIKE @naf
+        AND (employeesCategory = @emp OR employeesCategory IS NULL)
+        AND (
+          -- Haversine: distance <= rayon demandé
+          6371 * ACOS(
+            COS(RADIANS(@lat))
+            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+            * COS(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(0)] AS FLOAT64)) - RADIANS(@lng))
+            + SIN(RADIANS(@lat))
+            * SIN(RADIANS(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64)))
+          ) <= @radius
+        )
+      LIMIT 1000
+    `;
+    const options = {
+      query,
+      params: {
+        naf: `${nafRaw}%`,
+        emp: empRaw,
+        radius,
+        lng,
+        lat,
+      }
+    };
+    const [job] = await bq.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    // On réinjecte la valeur du filtre pour les NULL
+    const parsed = rows
+      .map(e => ({
+        ...e,
+        position: parsePosition(e.position),
+        employeesCategory: e.employeesCategory || empRaw
+      }))
+      .filter(isCompleteEntreprise);
+
+    const enriched = await Promise.all(parsed.map(ensureCoords));
+    console.log('🔎 Résultats BigQuery:', enriched.length, 'entrées');
+    res.json(enriched);
+  } catch (err) {
+    console.error('BigQuery /search-filters error:', err);
+    res.status(500).json({ error: 'Erreur interne BigQuery' });
+  }
+});
+
+/*app.get('/api/search-filters', async (req, res) => {
+  console.log('📬 search-filters reçu avec params', req.query);
+  const nafRaw = String(req.query.naf || '').trim();
+  const empRaw = String(req.query.employeesCategory || '').trim();
   if (!nafRaw || !empRaw) {
     return res.status(400).json({ error: 'naf et employeesCategory sont requis' });
   }
@@ -177,4 +255,4 @@ app.get('/api/search-filters', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-});
+});*/
