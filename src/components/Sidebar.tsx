@@ -1,4 +1,3 @@
-// src/components/Sidebar.tsx
 import React, { useState, useEffect } from 'react';
 import nafTree from '../data/naf-tree.json';
 import sectionLabelsJson from '../data/naf-sections.json';
@@ -13,6 +12,7 @@ interface SidebarProps {
   onClassify: (e: Entreprise, newType: EntrepriseType) => void;
   onLocate: (e: Entreprise) => void;
   onRemove: (e: Entreprise) => void;
+  onSearchSimilar: (e: Entreprise) => void; // Ajouté ici
   radius: number;
   onRadiusChange: (r: number) => void;
   onFilterSearch: (filters: { activityId: string; employeesCategory: string; radius: number }) => Promise<void>;
@@ -23,7 +23,7 @@ const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 const Sidebar: React.FC<SidebarProps> = ({
-  data, onSelectEntreprise, onClassify, onLocate, onRemove,
+  data, onSelectEntreprise, onClassify, onLocate, onRemove, onSearchSimilar,
   radius, onRadiusChange, onFilterSearch
 }) => {
   const [filterLoading, setFilterLoading] = useState(false);
@@ -94,7 +94,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   : type === EntrepriseType.Prospect ? '#F59E0B'
   : '#6B7280';
 
-  // --------- AJOUT BOUTON EXPORT ---------
+  // --------- BOUTON EXPORT ---------
   const exportEntreprises = () => {
     const data = localStorage.getItem("entreprises_cache");
     let exportData: string;
@@ -119,7 +119,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     a.click();
     URL.revokeObjectURL(url);
   };
-  // --------- FIN AJOUT EXPORT ---------
+
+  // --------- BOUTON VIDER LE CACHE ---------
+  const clearCache = () => {
+    localStorage.removeItem("entreprises_cache");
+    window.location.reload();
+  };
 
   return (
     <div className="sidebar">
@@ -193,13 +198,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                   : <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Client)}>Client</button>
                 }
                 <button className="icon-btn" onClick={() => onRemove(e)}>🗑️</button>
+                {/* BOUTON RECHERCHER SIMILAIRE */}
+                <button
+                  className="btn-sm"
+                  style={{ background: "#f59e42", color: "#fff", marginLeft: 8 }}
+                  title="Rechercher des entreprises similaires à celle-ci"
+                  onClick={() => onSearchSimilar(e)}
+                >
+                  Rechercher similaire
+                </button>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* --------- BOUTON EXPORT EN BAS --------- */}
+      {/* --------- BOUTONS EXPORT / CLEAR --------- */}
       <button
         onClick={exportEntreprises}
         style={{
@@ -215,6 +229,22 @@ const Sidebar: React.FC<SidebarProps> = ({
         }}
       >
         Exporter les entreprises
+      </button>
+      <button
+        onClick={clearCache}
+        style={{
+          marginTop: 12,
+          padding: "10px 20px",
+          background: "#f87171",
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer",
+          fontWeight: "bold",
+          width: "100%",
+        }}
+      >
+        Vider le cache
       </button>
       {/* --------- FIN AJOUT --------- */}
     </div>

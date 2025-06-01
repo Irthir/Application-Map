@@ -155,6 +155,16 @@ const App: React.FC = () => {
     }
   }
 
+  /** Recherche similaire (par code NAF + position + rayon) */
+  const handleSearchSimilar = async (e: Entreprise) => {
+    setCenter(e.position)
+    await handleFilterSearch({
+      activityId: e.codeNAF,
+      employeesCategory: "", // vide = toutes tailles, adapte si besoin
+      radius: filterRadius,
+    });
+  }
+
   return (
     <div className="app">
       {/* Sidebar : clients/prospects */}
@@ -164,6 +174,7 @@ const App: React.FC = () => {
         onClassify={handleUserClassify}
         onLocate={handleLocate}
         onRemove={handleUserRemove}
+        onSearchSimilar={handleSearchSimilar} // AJOUT ICI !
         radius={filterRadius}
         onRadiusChange={setFilterRadius}
         onFilterSearch={handleFilterSearch}
