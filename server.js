@@ -6,7 +6,7 @@ import fetch from 'node-fetch';               // npm install node-fetch
 import { BigQuery } from '@google-cloud/bigquery';
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const port = process.env.PORT || 10000;
 
 app.use(cors());
 app.use(express.json());
