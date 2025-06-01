@@ -6,7 +6,7 @@ import fetch from 'node-fetch';               // npm install node-fetch
 import { BigQuery } from '@google-cloud/bigquery';
 
 const app = express();
-const port = 10000;//process.env.PORT || 4000;
+const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
@@ -250,9 +250,9 @@ app.get('/api/search-filters', async (req, res) => {
     console.error('BigQuery /search-filters error:', err);
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
-});
+});*/
 
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
-});*/
+});
