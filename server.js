@@ -158,7 +158,7 @@ app.get('/api/search-filters', async (req, res) => {
             * SIN(CAST(SPLIT(REPLACE(REPLACE(position, '[', ''), ']', ''), ',')[OFFSET(1)] AS FLOAT64) * 3.141592653589793 / 180)
           )
         ) AS distance_km
-      FROM 'application-map-458717.sirene_data.merged_sirene'
+      FROM application-map-458717.sirene_data.merged_sirene
       WHERE codeNAF LIKE @naf
         AND (employeesCategory = @emp OR employeesCategory IS NULL)
         AND (
