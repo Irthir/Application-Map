@@ -126,7 +126,7 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// GET /api/search-filters?naf=…&employeesCategory=… — recherche par filtres
+// GET /api/search-filters?naf=…&employeesCategory=… — recherche par filtres (code NAF unique)
 app.get('/api/search-filters', async (req, res) => {
   console.log('📬 search-filters reçu avec params', req.query);
   const nafRaw = String(req.query.naf || '').trim();
@@ -209,6 +209,95 @@ app.get('/api/search-filters', async (req, res) => {
 
     const enriched = await Promise.all(parsed.map(ensureCoords));
     console.log('🔎 Résultats BigQuery:', enriched.length, 'entrées');
+    res.json(enriched);
+  } catch (err) {
+    console.error('BigQuery /search-filters error:', err);
+    res.status(500).json({ error: 'Erreur interne BigQuery' });
+  }
+});
+
+// POST /api/search-filters — recherche par plusieurs codes NAF (pour la recherche par section)
+app.post('/api/search-filters', async (req, res) => {
+  const nafs = req.body.nafs;
+  const empRaw = String(req.body.employeesCategory || '').trim();
+  const radius = Number(req.body.radius || 20);
+  const lng = Number(req.body.lng);
+  const lat = Number(req.body.lat);
+
+  if (!nafs || !Array.isArray(nafs) || !nafs.length || isNaN(lng) || isNaN(lat)) {
+    return res.status(400).json({ error: 'nafs, lng, lat sont requis' });
+  }
+
+  try {
+    const query = `
+      WITH entreprises AS (
+        SELECT
+          siren,
+          name,
+          codeNAF,
+          employeesCategory,
+          address,
+          position,
+          lon,
+          lat,
+          (
+            6371 * ACOS(
+              COS(@lat * 3.141592653589793 / 180)
+              * COS(lat * 3.141592653589793 / 180)
+              * COS((lon - @lng) * 3.141592653589793 / 180)
+              + SIN(@lat * 3.141592653589793 / 180)
+              * SIN(lat * 3.141592653589793 / 180)
+            )
+          ) AS distance_km
+        FROM application-map-458717.sirene_data.entreprises_fusion_final
+        WHERE codeNAF IN UNNEST(@nafs)
+          AND (
+            @emp = "" OR
+            employeesCategory = @emp OR employeesCategory IS NULL
+          )
+          AND (
+            6371 * ACOS(
+              COS(@lat * 3.141592653589793 / 180)
+              * COS(lat * 3.141592653589793 / 180)
+              * COS((lon - @lng) * 3.141592653589793 / 180)
+              + SIN(@lat * 3.141592653589793 / 180)
+              * SIN(lat * 3.141592653589793 / 180)
+            ) <= @radius
+          )
+      )
+      SELECT *
+      FROM (
+        SELECT
+          *,
+          ROW_NUMBER() OVER (PARTITION BY siren ORDER BY distance_km ASC) AS rn
+        FROM entreprises
+      )
+      WHERE rn = 1
+      LIMIT 1000
+    `;
+    const options = {
+      query,
+      params: {
+        nafs,
+        emp: empRaw,
+        radius,
+        lng,
+        lat,
+      }
+    };
+    const [job] = await bq.createQueryJob(options);
+    const [rows] = await job.getQueryResults();
+
+    const parsed = rows
+      .map(e => ({
+        ...e,
+        position: parsePosition(e.position),
+        employeesCategory: e.employeesCategory || empRaw
+      }))
+      .filter(isCompleteEntreprise);
+
+    const enriched = await Promise.all(parsed.map(ensureCoords));
+    console.log('🔎 Résultats BigQuery (section):', enriched.length, 'entrées');
     res.json(enriched);
   } catch (err) {
     console.error('BigQuery /search-filters error:', err);

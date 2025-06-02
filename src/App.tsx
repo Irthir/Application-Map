@@ -126,32 +126,58 @@ const App: React.FC = () => {
     setMapData(prev => prev.filter(x => x.siren !== e.siren))
   }
 
-  /** Recherche par filtres (activités, effectifs, rayon) */
+  /** Recherche par filtres (activités, effectifs, rayon, section éventuelle) */
   const handleFilterSearch = async (filters: {
-    activityId: string
+    nafCodes?: string[]
+    activityId?: string
     employeesCategory: string
     radius: number
   }) => {
     try {
-      setFilterRadius(filters.radius)
+      setFilterRadius(filters.radius);
 
-      const params = new URLSearchParams({
-        naf: filters.activityId,
-        employeesCategory: filters.employeesCategory,
-        radius: filters.radius.toString(),
-        lng: center[0].toString(),
-        lat: center[1].toString(),
-      })
-      const res = await fetch(
-        `https://application-map.onrender.com/api/search-filters?${params}`
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const rows: Entreprise[] = await res.json()
-      setSearchHistory(rows)
-      setMapData(rows)
-      console.log('Recherche par filtres réussie', rows)
+      let rows: Entreprise[];
+      if (filters.nafCodes && filters.nafCodes.length) {
+        // Recherche par section (plusieurs codes NAF)
+        const res = await fetch(`https://application-map.onrender.com/api/search-filters`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nafs: filters.nafCodes,
+            employeesCategory: filters.employeesCategory,
+            radius: filters.radius,
+            lng: center[0],
+            lat: center[1],
+          })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        rows = await res.json();
+      } else {
+        // Recherche classique par code NAF
+        const params = new URLSearchParams({
+          naf: filters.activityId || "",
+          employeesCategory: filters.employeesCategory,
+          radius: filters.radius.toString(),
+          lng: center[0].toString(),
+          lat: center[1].toString(),
+        });
+        const res = await fetch(
+          `https://application-map.onrender.com/api/search-filters?${params}`
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        rows = await res.json();
+      }
+
+      // --- Filtrage anti-doublons ---
+      const userSirenSet = new Set(userData.map(e => e.siren));
+      const filteredRows = rows.filter(e => !userSirenSet.has(e.siren));
+      // ------------------------------
+
+      setSearchHistory(filteredRows);
+      setMapData(filteredRows);
+      console.log('Recherche par filtres réussie', filteredRows);
     } catch (err) {
-      console.error('Recherche par filtres échouée :', err)
+      console.error('Recherche par filtres échouée :', err);
     }
   }
 
@@ -174,7 +200,7 @@ const App: React.FC = () => {
         onClassify={handleUserClassify}
         onLocate={handleLocate}
         onRemove={handleUserRemove}
-        onSearchSimilar={handleSearchSimilar} // AJOUT ICI !
+        onSearchSimilar={handleSearchSimilar}
         radius={filterRadius}
         onRadiusChange={setFilterRadius}
         onFilterSearch={handleFilterSearch}

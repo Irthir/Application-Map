@@ -6,6 +6,7 @@ import { Entreprise, EntrepriseType } from '../type';
 
 interface Activity { id: string; label: string; }
 interface Division { id: string; label: string; children: Activity[]; }
+interface NafSection { id: string; label: string; children: Activity[]; }
 interface SidebarProps {
   data: Entreprise[];
   onSelectEntreprise: (e: Entreprise) => void;
@@ -15,12 +16,20 @@ interface SidebarProps {
   onSearchSimilar: (e: Entreprise) => void;
   radius: number;
   onRadiusChange: (r: number) => void;
-  onFilterSearch: (filters: { activityId: string; employeesCategory: string; radius: number }) => Promise<void>;
+  onFilterSearch: (filters: { nafCodes?: string[]; activityId?: string; employeesCategory: string; radius: number }) => Promise<void>;
 }
 
 const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+'];
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+// -- Prépare les sections (à partir de naf-tree.json et naf-sections.json) --
+const nafSections: NafSection[] = (nafTree as any[]).map(section => {
+  const match = section.label.match(/Section\s+(\d+)/);
+  const id = match ? match[1] : section.label;
+  const label = sectionLabels[id] ? `${id} - ${sectionLabels[id]}` : section.label;
+  return { id, label, children: section.children };
+});
 
 const Sidebar: React.FC<SidebarProps> = ({
   data, onSelectEntreprise, onClassify, onLocate, onRemove, onSearchSimilar,
@@ -47,28 +56,34 @@ const Sidebar: React.FC<SidebarProps> = ({
     onSelectEntreprise(e);
   };
 
-  // Prépare les divisions NAF avec le libellé de section issu de naf-sections.json
-  const divisions: Division[] = (nafTree as { label: string; children: Activity[] }[]).map(div => {
-    // Extrait le numéro de section depuis "Section XX"
-    const match = div.label.match(/Section\s+(\d{1,2})/);
-    const id = match ? match[1] : div.label;
-    // Cherche le libellé français correspondant, sinon garde "Section XX"
-    const label = id && sectionLabels[id] ? sectionLabels[id] : div.label;
-    return {
-      id,
-      label,
-      children: div.children
-    };
-  });
-
-  // NAF filter state
+  // ----------- Gestion section / activité -----------
+  const [selectedSection, setSelectedSection] = useState('');
   const [nafSearch, setNafSearch] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
   const [employeesCategory, setEmployeesCategory] = useState(employeeBuckets[0]);
   const searchNorm = normalizeText(nafSearch);
 
-  // Filtre divisions et activités
-  const filteredDivs = divisions
+  // Quand une section est sélectionnée, on récupère tous les codes NAF de cette section
+  const selectedSectionCodes = selectedSection
+    ? (nafSections.find(s => s.id === selectedSection)?.children.map(a => a.id) ?? [])
+    : [];
+
+  // Affiche les activités (filtres) de la section sélectionnée OU toutes
+  const availableDivs: Division[] =
+    selectedSection
+      ? [{
+          id: selectedSection,
+          label: nafSections.find(s => s.id === selectedSection)?.label || '',
+          children: nafSections.find(s => s.id === selectedSection)?.children || []
+        }]
+      : (nafTree as { label: string; children: Activity[] }[]).map((div, idx) => ({
+          id: div.label || String(idx),
+          label: div.label,
+          children: div.children
+        }));
+
+  // Filtre divisions et activités selon nafSearch
+  const filteredDivs = availableDivs
     .map(div => {
       if (!nafSearch) return div;
       const divNorm = normalizeText(div.label);
@@ -78,15 +93,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       return null;
     })
     .filter((d): d is Division => !!d);
-
-  const handleFilterClick = async () => {
-    setFilterLoading(true);
-    try {
-      await onFilterSearch({ activityId: selectedActivity, employeesCategory, radius });
-    } finally {
-      setFilterLoading(false);
-    }
-  };
 
   // Color mapping
   const typeColor = (type?: EntrepriseType) =>
@@ -126,6 +132,29 @@ const Sidebar: React.FC<SidebarProps> = ({
     window.location.reload();
   };
 
+  // --------- ACTION RECHERCHE ---------
+  const handleFilterClick = async () => {
+    setFilterLoading(true);
+    try {
+      // Si une section est sélectionnée, recherche sur tous les codes NAF de la section
+      if (selectedSection && selectedSectionCodes.length) {
+        await onFilterSearch({
+          nafCodes: selectedSectionCodes,
+          employeesCategory,
+          radius
+        });
+      } else {
+        await onFilterSearch({
+          activityId: selectedActivity,
+          employeesCategory,
+          radius
+        });
+      }
+    } finally {
+      setFilterLoading(false);
+    }
+  };
+
   return (
     <div className="sidebar" style={{ height: "100vh", overflowY: "auto" }}>
       <h2>Rechercher</h2>
@@ -148,6 +177,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <h2>Rechercher par catégorie</h2>
       <div className="filters">
+        {/* --------- Sélection section --------- */}
+        <div className="filter-group">
+          <label>Section</label>
+          <select value={selectedSection} onChange={e => {
+            setSelectedSection(e.target.value);
+            setSelectedActivity('');
+            setNafSearch('');
+          }}>
+            <option value="">-- Toutes les sections --</option>
+            {nafSections.map(s => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+        </div>
+        {/* --------- Filtres activités --------- */}
         <div className="filter-group">
           <label>Activités</label>
           <input className="search" type="text" placeholder="Filtrer les activités..."
@@ -175,7 +219,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onChange={e => onRadiusChange(+e.target.value)} />
         </div>
         <button className="btn-primary" onClick={handleFilterClick}
-          disabled={!selectedActivity || filterLoading}>
+          disabled={filterLoading || (!(selectedSection && selectedSectionCodes.length) && !selectedActivity)}>
           {filterLoading ? 'Recherche...' : 'Lancer la recherche'}
         </button>
       </div>
