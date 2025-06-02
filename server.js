@@ -141,39 +141,49 @@ app.get('/api/search-filters', async (req, res) => {
 
   try {
     const query = `
-      SELECT
-        siren,
-        name,
-        codeNAF,
-        employeesCategory,
-        address,
-        position,
-        lon,
-        lat,
-        (
-          6371 * ACOS(
-            COS(@lat * 3.141592653589793 / 180)
-            * COS(lat * 3.141592653589793 / 180)
-            * COS((lon - @lng) * 3.141592653589793 / 180)
-            + SIN(@lat * 3.141592653589793 / 180)
-            * SIN(lat * 3.141592653589793 / 180)
+      WITH entreprises AS (
+        SELECT
+          siren,
+          name,
+          codeNAF,
+          employeesCategory,
+          address,
+          position,
+          lon,
+          lat,
+          (
+            6371 * ACOS(
+              COS(@lat * 3.141592653589793 / 180)
+              * COS(lat * 3.141592653589793 / 180)
+              * COS((lon - @lng) * 3.141592653589793 / 180)
+              + SIN(@lat * 3.141592653589793 / 180)
+              * SIN(lat * 3.141592653589793 / 180)
+            )
+          ) AS distance_km
+        FROM application-map-458717.sirene_data.entreprises_fusion_final
+        WHERE codeNAF LIKE @naf
+          AND (
+            @emp = "" OR
+            employeesCategory = @emp OR employeesCategory IS NULL
           )
-        ) AS distance_km
-      FROM application-map-458717.sirene_data.entreprises_fusion_final
-      WHERE codeNAF LIKE @naf
-        AND (
-          @emp = "" OR
-          employeesCategory = @emp OR employeesCategory IS NULL
-        )
-        AND (
-          6371 * ACOS(
-            COS(@lat * 3.141592653589793 / 180)
-            * COS(lat * 3.141592653589793 / 180)
-            * COS((lon - @lng) * 3.141592653589793 / 180)
-            + SIN(@lat * 3.141592653589793 / 180)
-            * SIN(lat * 3.141592653589793 / 180)
-          ) <= @radius
-        )
+          AND (
+            6371 * ACOS(
+              COS(@lat * 3.141592653589793 / 180)
+              * COS(lat * 3.141592653589793 / 180)
+              * COS((lon - @lng) * 3.141592653589793 / 180)
+              + SIN(@lat * 3.141592653589793 / 180)
+              * SIN(lat * 3.141592653589793 / 180)
+            ) <= @radius
+          )
+      )
+      SELECT *
+      FROM (
+        SELECT
+          *,
+          ROW_NUMBER() OVER (PARTITION BY siren ORDER BY distance_km ASC) AS rn
+        FROM entreprises
+      )
+      WHERE rn = 1
       LIMIT 1000
     `;
     const options = {
