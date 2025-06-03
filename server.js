@@ -47,7 +47,7 @@ async function ensureCoords(e) {
 
 // --- BigQuery setup ---
 const bq = new BigQuery({ projectId: process.env.GCP_PROJECT_ID });
-const TABLE_ID = '`application-map-458717.sirene_data.merged_sirene`';
+const TABLE_ID = '`application-map-458717.sirene_data.entreprises_fusion_final`';
 
 // filtre les entreprises incomplètes
 function isCompleteEntreprise(e) {

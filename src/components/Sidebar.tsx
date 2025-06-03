@@ -23,12 +23,9 @@ const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+'];
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-// -- Prépare les sections (à partir de naf-tree.json et naf-sections.json) --
-// Correction ici : label est le nom réel de la section, sans "Section XX"
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
   const id = match ? match[1] : section.label;
-  // Correction : on affiche juste le nom de la section, pas "01 - ..."
   const label = sectionLabels[id] ? sectionLabels[id] : section.label;
   return { id, label, children: section.children };
 });
@@ -65,12 +62,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [employeesCategory, setEmployeesCategory] = useState(employeeBuckets[0]);
   const searchNorm = normalizeText(nafSearch);
 
-  // Quand une section est sélectionnée, on récupère tous les codes NAF de cette section
   const selectedSectionCodes = selectedSection
     ? (nafSections.find(s => s.id === selectedSection)?.children.map(a => a.id) ?? [])
     : [];
 
-  // Affiche les activités (filtres) de la section sélectionnée OU toutes
   const availableDivs: Division[] =
     selectedSection
       ? [{
@@ -84,7 +79,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           children: div.children
         }));
 
-  // Filtre divisions et activités selon nafSearch
   const filteredDivs = availableDivs
     .map(div => {
       if (!nafSearch) return div;
@@ -96,26 +90,19 @@ const Sidebar: React.FC<SidebarProps> = ({
     })
     .filter((d): d is Division => !!d);
 
-  // Color mapping
   const typeColor = (type?: EntrepriseType) =>
     type === EntrepriseType.Client   ? '#10B981'
   : type === EntrepriseType.Prospect ? '#F59E0B'
   : '#6B7280';
 
-  // --------- BOUTON EXPORT ---------
+  // --------- EXPORTER LES ENTREPRISES ---------
   const exportEntreprises = () => {
     const data = localStorage.getItem("entreprises_cache");
     let exportData: string;
     if (!data || data === "[]") {
-      exportData = JSON.stringify([
-        {
-          siren: "123456789",
-          name: "Nom entreprise",
-          address: "Adresse",
-          type: "client | prospect",
-          // Ajoute ici les autres champs si besoin
-        }
-      ], null, 2);
+      // Si pas de données, propose le patron d'import (voir ci-dessous)
+      exportPatronImport();
+      return;
     } else {
       exportData = data;
     }
@@ -124,6 +111,28 @@ const Sidebar: React.FC<SidebarProps> = ({
     const a = document.createElement("a");
     a.href = url;
     a.download = "entreprises_export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // --------- MODELE D'IMPORT ---------
+  const exportPatronImport = () => {
+    const exampleData = [
+      {
+        siren: "123456789",
+        name: "Nom entreprise",
+        address: "1 rue de la Paix, 75000 Paris",
+        type: "client", // ou "prospect"
+        codeNAF: "1234Z",
+        employeesCategory: "1-10"
+        // position: [2.3522, 48.8566] // optionnel, sera géocodé si absent
+      }
+    ];
+    const blob = new Blob([JSON.stringify(exampleData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modele_import_entreprises.json";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -138,7 +147,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleFilterClick = async () => {
     setFilterLoading(true);
     try {
-      // Si une section est sélectionnée, recherche sur tous les codes NAF de la section
       if (selectedSection && selectedSectionCodes.length) {
         await onFilterSearch({
           nafCodes: selectedSectionCodes,
@@ -179,7 +187,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <h2>Rechercher par catégorie</h2>
       <div className="filters">
-        {/* --------- Sélection section --------- */}
         <div className="filter-group">
           <label>Section</label>
           <select value={selectedSection} onChange={e => {
@@ -193,7 +200,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             ))}
           </select>
         </div>
-        {/* --------- Filtres activités --------- */}
         <div className="filter-group">
           <label>Activités</label>
           <input className="search" type="text" placeholder="Filtrer les activités..."
@@ -238,7 +244,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="address">{e.address}</div>
               </div>
               <div className="user-actions" style={{ width: "170px" }}>
-                {/* Première ligne : centrage et classification */}
                 <div style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
                   <button className="btn-sm" onClick={() => onLocate(e)}>📍</button>
                   {isClient
@@ -246,7 +251,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     : <button className="btn-sm" onClick={() => onClassify(e, EntrepriseType.Client)}>Client</button>
                   }
                 </div>
-                {/* Deuxième ligne : rechercher similaire + suppression */}
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button
                     className="btn-sm"
@@ -264,13 +268,17 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* --------- BOUTONS EXPORT / CLEAR --------- */}
+      {/* --------- FORMAT & MODELE D'IMPORT --------- */}
+      <p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
+        <b>Format attendu :</b> fichier JSON avec les champs&nbsp;:<br />
+        <code>siren, name, address, type, codeNAF, employeesCategory</code>
+      </p>
       <button
-        onClick={exportEntreprises}
+        onClick={exportPatronImport}
         style={{
-          marginTop: 32,
+          marginTop: 0,
           padding: "10px 20px",
-          background: "#3182ce",
+          background: "#6366f1",
           color: "#fff",
           border: "none",
           borderRadius: "8px",
@@ -279,8 +287,28 @@ const Sidebar: React.FC<SidebarProps> = ({
           width: "100%",
         }}
       >
-        Exporter les entreprises
+        Télécharger un modèle d’import
       </button>
+
+      {/* --------- EXPORT / CLEAR --------- */}
+      {data && data.length > 0 && (
+        <button
+          onClick={exportEntreprises}
+          style={{
+            marginTop: 32,
+            padding: "10px 20px",
+            background: "#3182ce",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            width: "100%",
+          }}
+        >
+          Exporter les entreprises
+        </button>
+      )}
       <button
         onClick={clearCache}
         style={{
@@ -297,7 +325,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         Vider le cache
       </button>
-      {/* --------- FIN AJOUT --------- */}
     </div>
   );
 };
