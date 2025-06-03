@@ -294,10 +294,10 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      <p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
+      {/*<p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
         <b>Format attendu :</b> fichier JSON avec les champs&nbsp;:<br />
         <code>siren, name, address, type, codeNAF, employeesCategory</code>
-      </p>
+      </p>*/}
       <button
         onClick={exportPatronImport}
         style={{
