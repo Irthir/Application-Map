@@ -24,10 +24,12 @@ const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 // -- Prépare les sections (à partir de naf-tree.json et naf-sections.json) --
+// Correction ici : label est le nom réel de la section, sans "Section XX"
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
   const id = match ? match[1] : section.label;
-  const label = sectionLabels[id] ? `${id} - ${sectionLabels[id]}` : section.label;
+  // Correction : on affiche juste le nom de la section, pas "01 - ..."
+  const label = sectionLabels[id] ? sectionLabels[id] : section.label;
   return { id, label, children: section.children };
 });
 

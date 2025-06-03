@@ -1,5 +1,261 @@
 [
   {
+    "label": "Section 01",
+    "children": [
+      {
+        "id": "01.11Z",
+        "label": "Culture de céréales (à l'exception du riz), de légumineuses et de graines oléagineuses"
+      },
+      {
+        "id": "01.12Z",
+        "label": "Culture du riz"
+      },
+      {
+        "id": "01.13Z",
+        "label": "Culture de légumes, de melons, de racines et de tubercules"
+      },
+      {
+        "id": "01.14Z",
+        "label": "Culture de la canne à sucre"
+      },
+      {
+        "id": "01.15Z",
+        "label": "Culture du tabac"
+      },
+      {
+        "id": "01.16Z",
+        "label": "Culture de plantes à fibres"
+      },
+      {
+        "id": "01.19Z",
+        "label": "Autres cultures non permanentes"
+      },
+      {
+        "id": "01.21Z",
+        "label": "Culture de la vigne"
+      },
+      {
+        "id": "01.22Z",
+        "label": "Culture de fruits tropicaux et subtropicaux"
+      },
+      {
+        "id": "01.23Z",
+        "label": "Culture d'agrumes"
+      },
+      {
+        "id": "01.24Z",
+        "label": "Culture de fruits à pépins et à noyau"
+      },
+      {
+        "id": "01.25Z",
+        "label": "Culture d'autres fruits d'arbres ou d'arbustes et de fruits à coque"
+      },
+      {
+        "id": "01.26Z",
+        "label": "Culture de fruits oléagineux"
+      },
+      {
+        "id": "01.27Z",
+        "label": "Culture de plantes à boissons"
+      },
+      {
+        "id": "01.28Z",
+        "label": "Culture de plantes à épices, aromatiques, médicinales et pharmaceutiques"
+      },
+      {
+        "id": "01.29Z",
+        "label": "Autres cultures permanentes"
+      },
+      {
+        "id": "01.30Z",
+        "label": "Reproduction de plantes"
+      },
+      {
+        "id": "01.41Z",
+        "label": "Élevage de vaches laitières"
+      },
+      {
+        "id": "01.42Z",
+        "label": "Élevage d'autres bovins et de buffles"
+      },
+      {
+        "id": "01.43Z",
+        "label": "Élevage de chevaux et d'autres équidés"
+      },
+      {
+        "id": "01.44Z",
+        "label": "Élevage de chameaux et d'autres camélidés"
+      },
+      {
+        "id": "01.45Z",
+        "label": "Élevage d'ovins et de caprins"
+      },
+      {
+        "id": "01.46Z",
+        "label": "Élevage de porcins"
+      },
+      {
+        "id": "01.47Z",
+        "label": "Élevage de volailles"
+      },
+      {
+        "id": "01.49Z",
+        "label": "Élevage d'autres animaux"
+      },
+      {
+        "id": "01.50Z",
+        "label": "Culture et élevage associés"
+      },
+      {
+        "id": "01.61Z",
+        "label": "Activités de soutien aux cultures"
+      },
+      {
+        "id": "01.62Z",
+        "label": "Activités de soutien à la production animale"
+      },
+      {
+        "id": "01.63Z",
+        "label": "Traitement primaire des récoltes"
+      },
+      {
+        "id": "01.64Z",
+        "label": "Traitement des semences"
+      },
+      {
+        "id": "01.70Z",
+        "label": "Chasse, piégeage et services annexes"
+      }
+    ]
+  },
+  {
+    "label": "Section 02",
+    "children": [
+      {
+        "id": "02.10Z",
+        "label": "Sylviculture et autres activités forestières"
+      },
+      {
+        "id": "02.20Z",
+        "label": "Exploitation forestière"
+      },
+      {
+        "id": "02.30Z",
+        "label": "Récolte de produits forestiers non ligneux poussant à l'état sauvage"
+      },
+      {
+        "id": "02.40Z",
+        "label": "Services de soutien à l'exploitation forestière"
+      }
+    ]
+  },
+  {
+    "label": "Section 03",
+    "children": [
+      {
+        "id": "03.11Z",
+        "label": "Pêche en mer"
+      },
+      {
+        "id": "03.12Z",
+        "label": "Pêche en eau douce"
+      },
+      {
+        "id": "03.21Z",
+        "label": "Aquaculture en mer"
+      },
+      {
+        "id": "03.22Z",
+        "label": "Aquaculture en eau douce"
+      }
+    ]
+  },
+  {
+    "label": "Section 05",
+    "children": [
+      {
+        "id": "05.10Z",
+        "label": "Extraction de houille"
+      },
+      {
+        "id": "05.20Z",
+        "label": "Extraction de lignite"
+      }
+    ]
+  },
+  {
+    "label": "Section 06",
+    "children": [
+      {
+        "id": "06.10Z",
+        "label": "Extraction de pétrole brut"
+      },
+      {
+        "id": "06.20Z",
+        "label": "Extraction de gaz naturel"
+      }
+    ]
+  },
+  {
+    "label": "Section 07",
+    "children": [
+      {
+        "id": "07.10Z",
+        "label": "Extraction de minerais de fer"
+      },
+      {
+        "id": "07.21Z",
+        "label": "Extraction de minerais d'uranium et de thorium"
+      },
+      {
+        "id": "07.29Z",
+        "label": "Extraction d'autres minerais de métaux non ferreux"
+      }
+    ]
+  },
+  {
+    "label": "Section 08",
+    "children": [
+      {
+        "id": "08.11Z",
+        "label": "Extraction de pierres ornementales et de construction, de calcaire industriel, de gypse, de craie et d'ardoise"
+      },
+      {
+        "id": "08.12Z",
+        "label": "Exploitation de gravières et sablières, extraction d’argiles et de kaolin"
+      },
+      {
+        "id": "08.91Z",
+        "label": "Extraction des minéraux chimiques et d'engrais minéraux"
+      },
+      {
+        "id": "08.92Z",
+        "label": "Extraction de tourbe"
+      },
+      {
+        "id": "08.93Z",
+        "label": "Production de sel"
+      },
+      {
+        "id": "08.99Z",
+        "label": "Autres activités extractives n.c.a."
+      }
+    ]
+  },
+  {
+    "label": "Section 09",
+    "children": [
+      {
+        "id": "09.10Z",
+        "label": "Activités de soutien à l'extraction d'hydrocarbures"
+      },
+      {
+        "id": "09.90Z",
+        "label": "Activités de soutien aux autres industries extractives"
+      }
+    ]
+  },
+  {
     "label": "Section 10",
     "children": [
       {
@@ -3108,262 +3364,6 @@
       {
         "id": "99.00Z",
         "label": "Activités des organisations et organismes extraterritoriaux"
-      }
-    ]
-  },
-  {
-    "label": "Section 01",
-    "children": [
-      {
-        "id": "01.11Z",
-        "label": "Culture de céréales (à l'exception du riz), de légumineuses et de graines oléagineuses"
-      },
-      {
-        "id": "01.12Z",
-        "label": "Culture du riz"
-      },
-      {
-        "id": "01.13Z",
-        "label": "Culture de légumes, de melons, de racines et de tubercules"
-      },
-      {
-        "id": "01.14Z",
-        "label": "Culture de la canne à sucre"
-      },
-      {
-        "id": "01.15Z",
-        "label": "Culture du tabac"
-      },
-      {
-        "id": "01.16Z",
-        "label": "Culture de plantes à fibres"
-      },
-      {
-        "id": "01.19Z",
-        "label": "Autres cultures non permanentes"
-      },
-      {
-        "id": "01.21Z",
-        "label": "Culture de la vigne"
-      },
-      {
-        "id": "01.22Z",
-        "label": "Culture de fruits tropicaux et subtropicaux"
-      },
-      {
-        "id": "01.23Z",
-        "label": "Culture d'agrumes"
-      },
-      {
-        "id": "01.24Z",
-        "label": "Culture de fruits à pépins et à noyau"
-      },
-      {
-        "id": "01.25Z",
-        "label": "Culture d'autres fruits d'arbres ou d'arbustes et de fruits à coque"
-      },
-      {
-        "id": "01.26Z",
-        "label": "Culture de fruits oléagineux"
-      },
-      {
-        "id": "01.27Z",
-        "label": "Culture de plantes à boissons"
-      },
-      {
-        "id": "01.28Z",
-        "label": "Culture de plantes à épices, aromatiques, médicinales et pharmaceutiques"
-      },
-      {
-        "id": "01.29Z",
-        "label": "Autres cultures permanentes"
-      },
-      {
-        "id": "01.30Z",
-        "label": "Reproduction de plantes"
-      },
-      {
-        "id": "01.41Z",
-        "label": "Élevage de vaches laitières"
-      },
-      {
-        "id": "01.42Z",
-        "label": "Élevage d'autres bovins et de buffles"
-      },
-      {
-        "id": "01.43Z",
-        "label": "Élevage de chevaux et d'autres équidés"
-      },
-      {
-        "id": "01.44Z",
-        "label": "Élevage de chameaux et d'autres camélidés"
-      },
-      {
-        "id": "01.45Z",
-        "label": "Élevage d'ovins et de caprins"
-      },
-      {
-        "id": "01.46Z",
-        "label": "Élevage de porcins"
-      },
-      {
-        "id": "01.47Z",
-        "label": "Élevage de volailles"
-      },
-      {
-        "id": "01.49Z",
-        "label": "Élevage d'autres animaux"
-      },
-      {
-        "id": "01.50Z",
-        "label": "Culture et élevage associés"
-      },
-      {
-        "id": "01.61Z",
-        "label": "Activités de soutien aux cultures"
-      },
-      {
-        "id": "01.62Z",
-        "label": "Activités de soutien à la production animale"
-      },
-      {
-        "id": "01.63Z",
-        "label": "Traitement primaire des récoltes"
-      },
-      {
-        "id": "01.64Z",
-        "label": "Traitement des semences"
-      },
-      {
-        "id": "01.70Z",
-        "label": "Chasse, piégeage et services annexes"
-      }
-    ]
-  },
-  {
-    "label": "Section 02",
-    "children": [
-      {
-        "id": "02.10Z",
-        "label": "Sylviculture et autres activités forestières"
-      },
-      {
-        "id": "02.20Z",
-        "label": "Exploitation forestière"
-      },
-      {
-        "id": "02.30Z",
-        "label": "Récolte de produits forestiers non ligneux poussant à l'état sauvage"
-      },
-      {
-        "id": "02.40Z",
-        "label": "Services de soutien à l'exploitation forestière"
-      }
-    ]
-  },
-  {
-    "label": "Section 03",
-    "children": [
-      {
-        "id": "03.11Z",
-        "label": "Pêche en mer"
-      },
-      {
-        "id": "03.12Z",
-        "label": "Pêche en eau douce"
-      },
-      {
-        "id": "03.21Z",
-        "label": "Aquaculture en mer"
-      },
-      {
-        "id": "03.22Z",
-        "label": "Aquaculture en eau douce"
-      }
-    ]
-  },
-  {
-    "label": "Section 05",
-    "children": [
-      {
-        "id": "05.10Z",
-        "label": "Extraction de houille"
-      },
-      {
-        "id": "05.20Z",
-        "label": "Extraction de lignite"
-      }
-    ]
-  },
-  {
-    "label": "Section 06",
-    "children": [
-      {
-        "id": "06.10Z",
-        "label": "Extraction de pétrole brut"
-      },
-      {
-        "id": "06.20Z",
-        "label": "Extraction de gaz naturel"
-      }
-    ]
-  },
-  {
-    "label": "Section 07",
-    "children": [
-      {
-        "id": "07.10Z",
-        "label": "Extraction de minerais de fer"
-      },
-      {
-        "id": "07.21Z",
-        "label": "Extraction de minerais d'uranium et de thorium"
-      },
-      {
-        "id": "07.29Z",
-        "label": "Extraction d'autres minerais de métaux non ferreux"
-      }
-    ]
-  },
-  {
-    "label": "Section 08",
-    "children": [
-      {
-        "id": "08.11Z",
-        "label": "Extraction de pierres ornementales et de construction, de calcaire industriel, de gypse, de craie et d'ardoise"
-      },
-      {
-        "id": "08.12Z",
-        "label": "Exploitation de gravières et sablières, extraction d’argiles et de kaolin"
-      },
-      {
-        "id": "08.91Z",
-        "label": "Extraction des minéraux chimiques et d'engrais minéraux"
-      },
-      {
-        "id": "08.92Z",
-        "label": "Extraction de tourbe"
-      },
-      {
-        "id": "08.93Z",
-        "label": "Production de sel"
-      },
-      {
-        "id": "08.99Z",
-        "label": "Autres activités extractives n.c.a."
-      }
-    ]
-  },
-  {
-    "label": "Section 09",
-    "children": [
-      {
-        "id": "09.10Z",
-        "label": "Activités de soutien à l'extraction d'hydrocarbures"
-      },
-      {
-        "id": "09.90Z",
-        "label": "Activités de soutien aux autres industries extractives"
       }
     ]
   }

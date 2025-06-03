@@ -1,4 +1,3 @@
-// src/App.tsx
 import React, { useState, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import Map from './components/Map'
@@ -27,9 +26,9 @@ const App: React.FC = () => {
       try {
         const parsed = JSON.parse(cached)
         setUserData(parsed)
-        // On peut aussi les afficher sur la carte au lancement
+        // Optionnel : afficher clients/prospects au lancement
         setMapData(prev => {
-          // Optionnel : éviter de doubler si mapData déjà alimenté
+          // Évite les doublons
           const ids = new Set(parsed.map((e: Entreprise) => e.siren))
           return [...prev.filter(e => !ids.has(e.siren)), ...parsed]
         })
@@ -55,7 +54,7 @@ const App: React.FC = () => {
         if (Array.isArray(imported)) {
           setUserData(imported)
           localStorage.setItem(ENTREPRISES_CACHE_KEY, JSON.stringify(imported))
-          // Optionnel : afficher directement sur la carte
+          // Affiche les entreprises importées sur la carte
           setMapData(prev => {
             const ids = new Set(imported.map((e: Entreprise) => e.siren))
             return [...prev.filter(e => !ids.has(e.siren)), ...imported]
@@ -168,13 +167,14 @@ const App: React.FC = () => {
         rows = await res.json();
       }
 
-      // --- Filtrage anti-doublons ---
+      // --- Filtrage anti-doublons (n'affiche pas deux fois la même entreprise si elle est déjà dans les clients/prospects) ---
       const userSirenSet = new Set(userData.map(e => e.siren));
       const filteredRows = rows.filter(e => !userSirenSet.has(e.siren));
       // ------------------------------
 
       setSearchHistory(filteredRows);
-      setMapData(filteredRows);
+      // Correction ici : on affiche toujours clients/prospects + résultats recherche, sans doublon
+      setMapData([...userData, ...filteredRows]);
       console.log('Recherche par filtres réussie', filteredRows);
     } catch (err) {
       console.error('Recherche par filtres échouée :', err);
@@ -189,6 +189,7 @@ const App: React.FC = () => {
       employeesCategory: "", // vide = toutes tailles, adapte si besoin
       radius: filterRadius,
     });
+    // Rien à changer ici : l'entreprise e reste visible car elle est dans userData ou dans filteredRows
   }
 
   return (

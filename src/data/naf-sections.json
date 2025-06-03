@@ -1,4 +1,13 @@
 {
+  "01": "Agriculture, sylviculture et pêche",
+  "02": "Activités des ménages en tant qu'employeurs ; activités indifférenciées des ménages comme producteurs pour usage propre",
+  "03": "Extraction de houille et lignite",
+  "04": "Extraction de pétrole brut et de gaz naturel",
+  "05": "Extraction de minerais métalliques",
+  "06": "Extraction d'autres minerais",
+  "07": "Extraction de matériaux de construction et pierres ornementales",
+  "08": "Autres activités extractives",
+  "09": "Activités de soutien aux industries extractives",
   "10": "Industries alimentaires",
   "11": "Fabrication de boissons",
   "12": "Fabrication de produits à base de tabac",
@@ -79,14 +88,5 @@
   "96": "Autres services personnels",
   "97": "Activités des ménages employeurs de personnel domestique",
   "98": "Activités indifférenciées de services produits par les ménages pour usage propre",
-  "99": "Activités d'organismes extraterritoriaux",
-  "01": "Agriculture, sylviculture et pêche",
-  "02": "Activités des ménages en tant qu'employeurs ; activités indifférenciées des ménages comme producteurs pour usage propre",
-  "03": "Extraction de houille et lignite",
-  "04": "Extraction de pétrole brut et de gaz naturel",
-  "05": "Extraction de minerais métalliques",
-  "06": "Extraction d'autres minerais",
-  "07": "Extraction de matériaux de construction et pierres ornementales",
-  "08": "Autres activités extractives",
-  "09": "Activités de soutien aux industries extractives"
+  "99": "Activités d'organismes extraterritoriaux"
 }
