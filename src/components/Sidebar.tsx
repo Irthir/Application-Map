@@ -45,8 +45,8 @@ const empCodeLabels: Record<string, string> = {
   undefined: "Donnée manquante"
 };
 
-const typeChoices = ["client", "prospect"];
-const empCatChoices = ["1-10", "11-50", "51-200", "201-500", "501+"];
+//const typeChoices = ["client", "prospect"];
+//const empCatChoices = ["1-10", "11-50", "51-200", "201-500", "501+"];
 
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
