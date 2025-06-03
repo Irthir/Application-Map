@@ -95,21 +95,19 @@ app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
 
-  // Découpe les mots du terme
   const words = termRaw.split(/\s+/).filter(Boolean);
 
-  // Construit dynamiquement le SQL WHERE pour chaque mot
-  let whereClauses = [];
+  let nameAddressClauses = [];
   let params = {};
   words.forEach((word, idx) => {
-    whereClauses.push(`(LOWER(name) LIKE @w${idx} OR LOWER(address) LIKE @w${idx})`);
+    nameAddressClauses.push(`(LOWER(name) LIKE @w${idx} OR LOWER(address) LIKE @w${idx})`);
     params[`w${idx}`] = `%${word}%`;
   });
 
-  // Recherche exacte sur SIREN toujours possible
-  whereClauses.push(`siren = @term`);
-
-  const where = whereClauses.join(' AND ');
+  // Met SIREN dans un OR global, pas AND
+  const nameAddressConds = nameAddressClauses.length ? nameAddressClauses.join(' AND ') : '1=1';
+  const where = `(${nameAddressConds}) OR siren = @term`;
+  params.term = termRaw;
 
   const query = `
     SELECT siren, name, codeNAF, employeesCategory, address, position
@@ -117,8 +115,6 @@ app.get('/api/search', async (req, res) => {
     WHERE ${where}
     LIMIT 5
   `;
-
-  params.term = termRaw;
 
   try {
     const options = { query, params };
@@ -136,6 +132,7 @@ app.get('/api/search', async (req, res) => {
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
 });
+
 
 // GET /api/search-filters?naf=…&employeesCategory=… — recherche par filtres (code NAF unique)
 app.get('/api/search-filters', async (req, res) => {
