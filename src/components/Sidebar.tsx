@@ -23,6 +23,29 @@ const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+'];
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
+// Mapping code effectif SIRENE -> label affiché
+const empCodeLabels: Record<string, string> = {
+  "00": "0",
+  "01": "1-2",
+  "02": "3-5",
+  "03": "6-9",
+  "11": "10-19",
+  "12": "20-49",
+  "21": "50-99",
+  "22": "100-199",
+  "31": "200-249",
+  "32": "250-499",
+  "41": "500-999",
+  "42": "1000-1999",
+  "51": "2000-4999",
+  "52": "5000-9999",
+  "53": "10000+",
+  "NN": "Donnée manquante",
+  "": "Donnée manquante",
+  null: "Donnée manquante",
+  undefined: "Donnée manquante"
+};
+
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
   const id = match ? match[1] : section.label;
@@ -100,7 +123,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     const data = localStorage.getItem("entreprises_cache");
     let exportData: string;
     if (!data || data === "[]") {
-      // Si pas de données, propose le patron d'import (voir ci-dessous)
       exportPatronImport();
       return;
     } else {
@@ -125,7 +147,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         type: "client", // ou "prospect"
         codeNAF: "1234Z",
         employeesCategory: "1-10"
-        // position: [2.3522, 48.8566] // optionnel, sera géocodé si absent
       }
     ];
     const blob = new Blob([JSON.stringify(exampleData, null, 2)], { type: "application/json" });
@@ -237,11 +258,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         {data.map(e => {
           const color = typeColor(e.type);
           const isClient = e.type === EntrepriseType.Client;
+          const catCode = e.employeesCategory;
+          const empCat = empCodeLabels.hasOwnProperty(catCode)
+            ? empCodeLabels[catCode]
+            : "Donnée manquante";
           return (
             <div key={e.siren} className="user-item" style={{ borderLeft: `4px solid ${color}` }}>
               <div className="user-info">
                 <div className="name">{e.name}</div>
                 <div className="address">{e.address}</div>
+                <div className="employees">Employés : {empCat}</div>
               </div>
               <div className="user-actions" style={{ width: "170px" }}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 2 }}>
@@ -268,7 +294,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* --------- FORMAT & MODELE D'IMPORT --------- */}
       <p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
         <b>Format attendu :</b> fichier JSON avec les champs&nbsp;:<br />
         <code>siren, name, address, type, codeNAF, employeesCategory</code>
@@ -290,7 +315,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         Télécharger un modèle d’import
       </button>
 
-      {/* --------- EXPORT / CLEAR --------- */}
       {data && data.length > 0 && (
         <button
           onClick={exportEntreprises}

@@ -28,6 +28,29 @@ const buildNafLabelMap = () => {
 };
 const nafLabelMap = buildNafLabelMap();
 
+// --- MAPPING CODES EMPLOYES -> LABEL ---
+const empCodeLabels: Record<string, string> = {
+  "00": "0",
+  "01": "1-2",
+  "02": "3-5",
+  "03": "6-9",
+  "11": "10-19",
+  "12": "20-49",
+  "21": "50-99",
+  "22": "100-199",
+  "31": "200-249",
+  "32": "250-499",
+  "41": "500-999",
+  "42": "1000-1999",
+  "51": "2000-4999",
+  "52": "5000-9999",
+  "53": "10000+",
+  "NN": "Donnée manquante",
+  "": "Donnée manquante",
+  null: "Donnée manquante",
+  undefined: "Donnée manquante"
+};
+
 const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -106,19 +129,10 @@ const Map: React.FC<MapProps> = ({ data, center, filterRadius, onClickSetCenter 
       const typeLabel = e.type || 'Recherche';
       const nafSectionKey = e.codeNAF.slice(0, 2);
       const nafLabel = nafLabelMap[e.codeNAF] || sectionLabels[nafSectionKey as keyof typeof sectionLabels] || e.codeNAF;
-      let empCat = 'N/A';
-      if (e.employeesCategory) {
-        const num = Number(e.employeesCategory.replace(/\D/g, ''));
-        if (!isNaN(num)) {
-          if (num <= 10) empCat = '1-10';
-          else if (num <= 50) empCat = '11-50';
-          else if (num <= 200) empCat = '51-200';
-          else if (num <= 500) empCat = '201-500';
-          else empCat = '501+';
-        } else {
-          empCat = e.employeesCategory;
-        }
-      }
+      const catCode = e.employeesCategory;
+      const empCat = empCodeLabels.hasOwnProperty(catCode)
+        ? empCodeLabels[catCode]
+        : "Donnée manquante";
       const addr = e.address || '';
 
       const html = `<div style="font-size:14px;line-height:1.4">
