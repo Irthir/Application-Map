@@ -23,7 +23,6 @@ const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+'];
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-// Mapping code effectif SIRENE -> label affiché
 const empCodeLabels: Record<string, string> = {
   "00": "0",
   "01": "1-2",
@@ -45,6 +44,9 @@ const empCodeLabels: Record<string, string> = {
   null: "Donnée manquante",
   undefined: "Donnée manquante"
 };
+
+const typeChoices = ["client", "prospect"];
+const empCatChoices = ["1-10", "11-50", "51-200", "201-500", "501+"];
 
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
@@ -137,16 +139,22 @@ const Sidebar: React.FC<SidebarProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // --------- MODELE D'IMPORT ---------
+  // --------- PATRON D'IMPORT ---------
   const exportPatronImport = () => {
     const exampleData = [
       {
-        siren: "123456789",
-        name: "Nom entreprise",
-        address: "1 rue de la Paix, 75000 Paris",
-        type: "client", // ou "prospect"
-        codeNAF: "1234Z",
-        employeesCategory: "1-10"
+        "siren": "123456789",
+        "_comment_siren": "SIREN sur 9 chiffres, obligatoire",
+        "name": "Nom entreprise",
+        "_comment_name": "Nom de l'entreprise, obligatoire",
+        "address": "1 rue de la Paix, 75000 Paris",
+        "_comment_address": "Adresse complète, obligatoire",
+        "type": "client",
+        "_comment_type": "Obligatoire. Valeurs possibles : client, prospect",
+        "codeNAF": "1234Z",
+        "_comment_codeNAF": "Code NAF (5 caractères), optionnel mais recommandé",
+        "employeesCategory": "1-10",
+        "_comment_employeesCategory": "Obligatoire. Valeurs possibles : 1-10, 11-50, 51-200, 201-500, 501+"
       }
     ];
     const blob = new Blob([JSON.stringify(exampleData, null, 2)], { type: "application/json" });
@@ -294,10 +302,20 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/*<p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
-        <b>Format attendu :</b> fichier JSON avec les champs&nbsp;:<br />
-        <code>siren, name, address, type, codeNAF, employeesCategory</code>
-      </p>*/}
+      <p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
+        <b>Format attendu :</b> fichier JSON (UTF-8) à remplir, chaque objet doit avoir :<br />
+        <code>
+          siren : SIREN sur 9 chiffres<br />
+          name : nom de l'entreprise<br />
+          address : adresse complète<br />
+          type : client ou prospect<br />
+          codeNAF : code NAF (5 caractères, optionnel)<br />
+          employeesCategory : parmi 1-10, 11-50, 51-200, 201-500, 501+<br />
+        </code>
+        <span style={{ fontSize: "0.95em" }}>
+          <br />Exemple prêt à remplir à télécharger ci-dessous.
+        </span>
+      </p>
       <button
         onClick={exportPatronImport}
         style={{
