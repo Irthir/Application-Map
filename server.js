@@ -133,8 +133,37 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
+// ... (tout le haut de server.js inchangé)
 
-// GET /api/search-filters?naf=…&employeesCategory=… — recherche par filtres (code NAF unique)
+// MAPPING TRANCHE UI -> BORNES D'EFFECTIF
+const employeeTrancheBounds = {
+  "1-10":    [1, 10],
+  "11-50":   [11, 50],
+  "51-200":  [51, 200],
+  "201-500": [201, 500],
+  "501+":    [501, 100000]
+};
+// MAPPING CODE SIRENE -> BORNES
+const codeRanges = {
+  "00": [0, 0],
+  "01": [1, 2],
+  "02": [3, 5],
+  "03": [6, 9],
+  "11": [10, 19],
+  "12": [20, 49],
+  "21": [50, 99],
+  "22": [100, 199],
+  "31": [200, 249],
+  "32": [250, 499],
+  "41": [500, 999],
+  "42": [1000, 1999],
+  "51": [2000, 4999],
+  "52": [5000, 9999],
+  "53": [10000, 999999],
+  "NN": [null, null]
+};
+
+// GET /api/search-filters?naf=…&employeesCategory=…&radius=…&lng=…&lat=…
 app.get('/api/search-filters', async (req, res) => {
   console.log('📬 search-filters reçu avec params', req.query);
   const nafRaw = String(req.query.naf || '').trim();
@@ -148,6 +177,7 @@ app.get('/api/search-filters', async (req, res) => {
   }
 
   try {
+    // La requête SQL NE FILTRE PAS sur employeesCategory (pour tous les résultats de la zone/rayon)
     const query = `
       WITH entreprises AS (
         SELECT
@@ -170,10 +200,6 @@ app.get('/api/search-filters', async (req, res) => {
           ) AS distance_km
         FROM application-map-458717.sirene_data.entreprises_fusion_final
         WHERE codeNAF LIKE @naf
-          AND (
-            @emp = "" OR
-            employeesCategory = @emp OR employeesCategory IS NULL
-          )
           AND (
             6371 * ACOS(
               COS(@lat * 3.141592653589793 / 180)
@@ -198,7 +224,6 @@ app.get('/api/search-filters', async (req, res) => {
       query,
       params: {
         naf: `${nafRaw}%`,
-        emp: empRaw,
         radius,
         lng,
         lat,
@@ -207,15 +232,27 @@ app.get('/api/search-filters', async (req, res) => {
     const [job] = await bq.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
+    // Parse et enrichit comme d'habitude
     const parsed = rows
       .map(e => ({
         ...e,
-        position: parsePosition(e.position),
-        employeesCategory: e.employeesCategory || empRaw
+        position: parsePosition(e.position)
       }))
       .filter(isCompleteEntreprise);
 
-    const enriched = await Promise.all(parsed.map(ensureCoords));
+    // ------ FILTRAGE EFFECTIF CÔTÉ JS SELON LA TRANCHE ------
+    let filtered = parsed;
+    if (empRaw && employeeTrancheBounds[empRaw]) {
+      const [tMin, tMax] = employeeTrancheBounds[empRaw];
+      filtered = parsed.filter(e => {
+        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
+        // Inclure uniquement si la plage du code recouvre au moins partiellement la tranche demandée
+        // (ou inverser la logique selon besoin)
+        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
+      });
+    }
+
+    const enriched = await Promise.all(filtered.map(ensureCoords));
     console.log('🔎 Résultats BigQuery:', enriched.length, 'entrées');
     res.json(enriched);
   } catch (err) {
@@ -223,6 +260,7 @@ app.get('/api/search-filters', async (req, res) => {
     res.status(500).json({ error: 'Erreur interne BigQuery' });
   }
 });
+
 
 // POST /api/search-filters — recherche par plusieurs codes NAF (pour la recherche par section)
 app.post('/api/search-filters', async (req, res) => {
