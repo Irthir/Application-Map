@@ -95,22 +95,33 @@ app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
 
+  // Découpe les mots du terme
+  const words = termRaw.split(/\s+/).filter(Boolean);
+
+  // Construit dynamiquement le SQL WHERE pour chaque mot
+  let whereClauses = [];
+  let params = {};
+  words.forEach((word, idx) => {
+    whereClauses.push(`(LOWER(name) LIKE @w${idx} OR LOWER(address) LIKE @w${idx})`);
+    params[`w${idx}`] = `%${word}%`;
+  });
+
+  // Recherche exacte sur SIREN toujours possible
+  whereClauses.push(`siren = @term`);
+
+  const where = whereClauses.join(' AND ');
+
+  const query = `
+    SELECT siren, name, codeNAF, employeesCategory, address, position
+    FROM ${TABLE_ID}
+    WHERE ${where}
+    LIMIT 5
+  `;
+
+  params.term = termRaw;
+
   try {
-    const query = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
-      FROM ${TABLE_ID}
-      WHERE LOWER(name) LIKE @patt
-         OR siren = @term
-         OR LOWER(address) LIKE @patt
-      LIMIT 5
-    `;
-    const options = {
-      query,
-      params: {
-        patt: `%${termRaw}%`,
-        term: termRaw
-      }
-    };
+    const options = { query, params };
     const [job] = await bq.createQueryJob(options);
     const [rows] = await job.getQueryResults();
 
