@@ -45,9 +45,6 @@ const empCodeLabels: Record<string, string> = {
   undefined: "Donnée manquante"
 };
 
-//const typeChoices = ["client", "prospect"];
-//const empCatChoices = ["1-10", "11-50", "51-200", "201-500", "501+"];
-
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
   const id = match ? match[1] : section.label;
@@ -61,26 +58,30 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [filterLoading, setFilterLoading] = useState(false);
 
-  // Search entreprises
+  // Recherche entreprises texte
   const [searchText, setSearchText] = useState('');
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!searchText) return setSuggestions([]);
+    if (!searchText) {
+      setSuggestions([]);
+      return;
+    }
     setLoading(true);
     fetch(`https://application-map.onrender.com/api/search?term=${encodeURIComponent(searchText)}`)
       .then(res => res.json())
-      .then((res: Entreprise[]) => setSuggestions(res))
+      .then((res: Entreprise[]) => setSuggestions(Array.isArray(res) ? res : []))
       .finally(() => setLoading(false));
   }, [searchText]);
 
   const handleSearchSelect = (e: Entreprise) => {
-    setSearchText(''); setSuggestions([]);
+    setSearchText('');
+    setSuggestions([]);
     onSelectEntreprise(e);
   };
 
-  // ----------- Gestion section / activité -----------
+  // Gestion section / activité
   const [selectedSection, setSelectedSection] = useState('');
   const [nafSearch, setNafSearch] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
@@ -120,48 +121,56 @@ const Sidebar: React.FC<SidebarProps> = ({
   : type === EntrepriseType.Prospect ? '#F59E0B'
   : '#6B7280';
 
-  // --------- EXPORTER LES ENTREPRISES ---------
+  // --------- EXPORTER LES ENTREPRISES EN CSV ---------
   const exportEntreprises = () => {
     const data = localStorage.getItem("entreprises_cache");
-    let exportData: string;
-    if (!data || data === "[]") {
+    let rows: Entreprise[] = [];
+    if (data && data !== "[]") {
+      try {
+        rows = JSON.parse(data);
+      } catch {
+        rows = [];
+      }
+    }
+    if (!rows.length) {
       exportPatronImport();
       return;
-    } else {
-      exportData = data;
     }
-    const blob = new Blob([exportData], { type: "application/json" });
+    const headers = ["siren", "name", "address", "type", "codeNAF", "employeesCategory"];
+    const csv = [
+      headers.join(","),
+      ...rows.map(e =>
+        headers.map(h => {
+          let val = (e as any)[h] ?? "";
+          if (typeof val === "string" && (val.includes(",") || val.includes("\n") || val.includes('"'))) {
+            val = `"${val.replace(/"/g, '""')}"`;
+          }
+          return val;
+        }).join(",")
+      )
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "entreprises_export.json";
+    a.download = "entreprises_export.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // --------- PATRON D'IMPORT ---------
+  // --------- MODELE CSV D'IMPORT ---------
   const exportPatronImport = () => {
-    const exampleData = [
-      {
-        "siren": "123456789",
-        "_comment_siren": "SIREN sur 9 chiffres, obligatoire",
-        "name": "Nom entreprise",
-        "_comment_name": "Nom de l'entreprise, obligatoire",
-        "address": "1 rue de la Paix, 75000 Paris",
-        "_comment_address": "Adresse complète, obligatoire",
-        "type": "client",
-        "_comment_type": "Obligatoire. Valeurs possibles : client, prospect",
-        "codeNAF": "1234Z",
-        "_comment_codeNAF": "Code NAF (5 caractères), optionnel mais recommandé",
-        "employeesCategory": "1-10",
-        "_comment_employeesCategory": "Obligatoire. Valeurs possibles : 1-10, 11-50, 51-200, 201-500, 501+"
-      }
-    ];
-    const blob = new Blob([JSON.stringify(exampleData, null, 2)], { type: "application/json" });
+    const csv =
+      "siren,name,address,type,codeNAF,employeesCategory\n" +
+      '123456789,"Nom entreprise","1 rue de la Paix, 75000 Paris",client,1234Z,1-10\n' +
+      "# type : client ou prospect\n" +
+      "# employeesCategory : 1-10, 11-50, 51-200, 201-500, 501+\n" +
+      "# codeNAF : optionnel (laisser vide si inconnu)\n";
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "modele_import_entreprises.json";
+    a.download = "modele_import_entreprises.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -302,20 +311,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      <p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
-        <b>Format attendu :</b> fichier JSON (UTF-8) à remplir, chaque objet doit avoir :<br />
-        <code>
-          siren : SIREN sur 9 chiffres<br />
-          name : nom de l'entreprise<br />
-          address : adresse complète<br />
-          type : client ou prospect<br />
-          codeNAF : code NAF (5 caractères, optionnel)<br />
-          employeesCategory : parmi 1-10, 11-50, 51-200, 201-500, 501+<br />
-        </code>
-        <span style={{ fontSize: "0.95em" }}>
-          <br />Exemple prêt à remplir à télécharger ci-dessous.
-        </span>
-      </p>
+      {/*<p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
+        <b>Format attendu :</b> CSV avec les colonnes&nbsp;:<br />
+        <code>siren, name, address, type, codeNAF, employeesCategory</code><br />
+        type = client | prospect&nbsp; | &nbsp;
+        employeesCategory = 1-10, 11-50, 51-200, 201-500, 501+<br />
+        codeNAF : optionnel (laisser vide si inconnu)
+      </p>*/}
       <button
         onClick={exportPatronImport}
         style={{
@@ -348,7 +350,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             width: "100%",
           }}
         >
-          Exporter les entreprises
+          Exporter les entreprises (CSV)
         </button>
       )}
       <button

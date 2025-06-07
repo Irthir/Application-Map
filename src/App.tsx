@@ -7,6 +7,39 @@ import './index.css'
 
 const ENTREPRISES_CACHE_KEY = "entreprises_cache";
 
+function parseCsv(csv: string): Entreprise[] {
+  // CSV simple : séparateur virgule, double quotes, pas d'en-têtes optionnelles
+  const lines = csv.split(/\r?\n/).filter(l => l.trim() && !l.startsWith("#"));
+  if (!lines.length) return [];
+  const headers = lines[0].split(",").map(h => h.trim());
+  const rows = lines.slice(1).map(line => {
+    // CSV parse simple, gère les guillemets/doublons pour ce cas précis
+    const cols: string[] = [];
+    let i = 0, inQuotes = false, col = '';
+    while (i < line.length) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          col += '"'; i += 2; continue;
+        }
+        inQuotes = !inQuotes; i++; continue;
+      }
+      if (!inQuotes && char === ',') {
+        cols.push(col); col = ''; i++; continue;
+      }
+      col += char; i++;
+    }
+    cols.push(col);
+    // On convertit en Entreprise
+    const obj: any = {};
+    headers.forEach((h, idx) => { obj[h] = cols[idx]?.trim() ?? ""; });
+    // Conversion optionnelle type safe si besoin
+    if (obj.type !== "client" && obj.type !== "prospect") obj.type = undefined;
+    return obj as Entreprise;
+  });
+  return rows.filter(e => e.siren && e.name && e.address);
+}
+
 const App: React.FC = () => {
   // Tous les marqueurs sur la carte
   const [mapData, setMapData] = useState<Entreprise[]>([])
@@ -18,6 +51,17 @@ const App: React.FC = () => {
   const [center, setCenter] = useState<[number, number]>([2.3522, 48.8566])
   // Rayon de filtre utilisé pour dessiner le cercle sur la carte
   const [filterRadius, setFilterRadius] = useState<number>(20)
+  
+  useEffect(() => {
+    fetch("https://application-map.onrender.com/api/ping")
+      .then(res => res.json())
+      .then(data => {
+        console.log("Ping backend:", data);
+      })
+      .catch(() => {
+        console.warn("Ping backend échoué");
+      });
+  }, []);
 
   // 1. CHARGER LE CACHE AU DEMARRAGE
   useEffect(() => {
@@ -43,15 +87,16 @@ const App: React.FC = () => {
     localStorage.setItem(ENTREPRISES_CACHE_KEY, JSON.stringify(userData))
   }, [userData])
 
-  /** Import depuis fichier JSON */
+  /** Import depuis fichier CSV */
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
     reader.onload = (event) => {
       try {
-        const imported = JSON.parse(event.target?.result as string)
-        if (Array.isArray(imported)) {
+        const csv = event.target?.result as string
+        const imported = parseCsv(csv)
+        if (Array.isArray(imported) && imported.length) {
           setUserData(imported)
           localStorage.setItem(ENTREPRISES_CACHE_KEY, JSON.stringify(imported))
           // Affiche les entreprises importées sur la carte
@@ -60,7 +105,7 @@ const App: React.FC = () => {
             return [...prev.filter(e => !ids.has(e.siren)), ...imported]
           })
         } else {
-          alert("Le fichier doit contenir un tableau JSON d'entreprises.")
+          alert("Le fichier doit contenir un CSV avec les colonnes attendues.")
         }
       } catch (err) {
         alert("Erreur lors de la lecture du fichier d'import.")
@@ -245,7 +290,7 @@ const App: React.FC = () => {
             Importer entreprises
             <input
               type="file"
-              accept="application/json"
+              accept=".csv,text/csv"
               style={{ display: "none" }}
               onChange={handleImport}
             />

@@ -351,6 +351,11 @@ app.post('/api/search-filters', async (req, res) => {
   }
 });
 
+// Endpoint ping pour réveil rapide
+app.get('/api/ping', (_req, res) => {
+  res.json({ pong: true, ts: Date.now() });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
 });
