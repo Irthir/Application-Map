@@ -243,7 +243,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <input className="search" type="text" placeholder="Filtrer les activités..."
             value={nafSearch} onChange={e => setNafSearch(e.target.value)} />
           <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)}>
-            <option value="">-- Sélectionner --</option>
+            <option value="">-- Rechercher sur toute la Section --</option>
             {filteredDivs.map(div => (
               <optgroup key={div.id} label={div.label}>
                 {div.children.map(a => (
