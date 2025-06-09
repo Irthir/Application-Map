@@ -113,17 +113,30 @@ app.get('/api/search', async (req, res) => {
     where.push(`(LOWER(name) LIKE ? OR LOWER(address) LIKE ?)`);
     params.push(`%${word}%`, `%${word}%`);
   });
-  const whereClause = where.length ? where.join(' AND ') : '1=1';
 
-  const sql = `
-    SELECT siren, name, codeNAF, employeesCategory, address, position
-    FROM ${TABLE}
-    WHERE (${whereClause}) OR siren = ?
-    LIMIT 5
-  `;
-  params.push(termRaw);
+  let whereClause = where.length ? where.join(' AND ') : '1=1';
 
-  db.all(sql, params, async (err, rows) => {
+  // Optionnel : on ajoute la clause SIREN si ça ressemble à un siren
+  let sql, paramsFinal;
+  if (/^\d{9}$/.test(termRaw)) {
+    sql = `
+      SELECT siren, name, codeNAF, employeesCategory, address, position
+      FROM ${TABLE}
+      WHERE (${whereClause}) OR siren = ?
+      LIMIT 5
+    `;
+    paramsFinal = [...params, termRaw];
+  } else {
+    sql = `
+      SELECT siren, name, codeNAF, employeesCategory, address, position
+      FROM ${TABLE}
+      WHERE (${whereClause})
+      LIMIT 5
+    `;
+    paramsFinal = params;
+  }
+
+  db.all(sql, paramsFinal, async (err, rows) => {
     if (err) {
       console.error('DuckDB /search error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
