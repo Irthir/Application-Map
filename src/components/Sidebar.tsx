@@ -242,16 +242,23 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Sélection de la section */}
         <div className="filter-group">
           <label>Section</label>
-          <select value={selectedSection} onChange={e => {
-            setSelectedSection(e.target.value);
-            setSelectedActivity('');
-            setNafSearch('');
-          }}>
+          <select
+            value={selectedSection}
+            onChange={e => {
+              setSelectedSection(e.target.value);
+              setSelectedActivity('');
+              setNafSearch('');
+            }}
+          >
             <option value="">-- Toutes les sections --</option>
-            {nafSections.map((s, idx) => {
-              // Section code = index+1 sur 2 chiffres ("01", "02", ...)
-              const sectionCode = String(idx + 1).padStart(2, '0');
-              const label = sectionLabels[sectionCode] || s.label;
+            {nafSections.map((s) => {
+              // Tente d'extraire le code section à partir du label (ex: "Section 01" -> "01")
+              let code = '';
+              const m = String(s.label).match(/Section\s+(\d+)/);
+              if (m) code = m[1].padStart(2, '0');
+              else if (/^\d+$/.test(s.id)) code = s.id.padStart(2, '0');
+              else code = s.id;
+              const label = sectionLabels[code] || s.label;
               return (
                 <option key={s.id} value={s.id}>{label}</option>
               );
@@ -272,19 +279,30 @@ const Sidebar: React.FC<SidebarProps> = ({
           <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)}>
             <option value="">
               -- {selectedSection
-                ? `Rechercher sur toute la section ${(() => {
-                    // Affiche le vrai nom de la section
-                    const idx = nafSections.findIndex(s => s.id === selectedSection);
-                    const code = String(idx + 1).padStart(2, '0');
-                    return sectionLabels[code] || selectedSection;
-                  })()}`
+                ? `Rechercher sur toute la section ${
+                    (() => {
+                      const selSectionObj = nafSections.find(s => s.id === selectedSection);
+                      let code = '';
+                      if (selSectionObj) {
+                        const m = String(selSectionObj.label).match(/Section\s+(\d+)/);
+                        if (m) code = m[1].padStart(2, '0');
+                        else if (/^\d+$/.test(selSectionObj.id)) code = selSectionObj.id.padStart(2, '0');
+                        else code = selSectionObj.id;
+                      }
+                      return sectionLabels[code] || selectedSection;
+                    })()
+                  }`
                 : "Rechercher sur toute la Section"
               } --
             </option>
-            {filteredDivs.map((div, idx) => {
-              // Ici on synchronise aussi section code à partir de l'index
-              const sectionCode = String(idx + 1).padStart(2, '0');
-              const label = sectionLabels[sectionCode] || div.label;
+            {filteredDivs.map(div => {
+              // Pareil : essayer de trouver le code section à partir du label ou id
+              let code = '';
+              const m = String(div.label).match(/Section\s+(\d+)/);
+              if (m) code = m[1].padStart(2, '0');
+              else if (/^\d+$/.test(div.id)) code = div.id.padStart(2, '0');
+              else code = div.id;
+              const label = sectionLabels[code] || div.label;
               return (
                 <optgroup key={div.id} label={label}>
                   {div.children.map(a => (
@@ -325,6 +343,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           {filterLoading ? 'Recherche...' : 'Lancer la recherche'}
         </button>
       </div>
+
 
 
       <div className="user-list">
