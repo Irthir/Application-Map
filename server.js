@@ -184,7 +184,8 @@ app.get('/api/search-filters', async (req, res) => {
     WHERE distance_km <= ?
     LIMIT 1000
   `;
-  db.all(sql, [`${nafRaw}%`, radius], async (err, rows) => {
+  // Il y a exactement 2 ? : [codeNAF, radius]
+  db.all(sql, [String(nafRaw) + '%', Number(radius)], async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
@@ -240,7 +241,8 @@ app.post('/api/search-filters', async (req, res) => {
     WHERE distance_km <= ?
     LIMIT 1000
   `;
-  db.all(sql, [...nafs, radius], async (err, rows) => {
+  // nombre de ? = nafs.length + 1 (le +1 c'est le radius)
+  db.all(sql, [...nafs.map(String), Number(radius)], async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
