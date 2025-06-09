@@ -11,9 +11,17 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-const db = new duckdb.Database('md:');
+// --- BDD ---
+let db;
+try {
+  db = new duckdb.Database('md:');
+} catch (err) {
+  console.error('Erreur à l’ouverture de DuckDB:', err);
+  process.exit(1);
+}
 const TABLE = 'entreprises';
 
+// --- MAPBOX ---
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJjbTc0aTR0aGcwYTJqMnFxeWdnN2N1NTRiIn0.UA9uEMwBO-JpQAkiutk_lg';
 if (!MAPBOX_TOKEN) {
   console.warn('⚠️ MAPBOX_TOKEN non défini – la géolocalisation par adresse tombera toujours sur Paris');
@@ -64,6 +72,7 @@ function parsePosition(raw) {
   return [lng, lat];
 }
 
+// --- ALL
 app.get('/api/all', async (_req, res) => {
   try {
     const sql = `
@@ -87,6 +96,7 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
+// --- SEARCH (texte)
 app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
@@ -122,7 +132,7 @@ app.get('/api/search', async (req, res) => {
   });
 });
 
-// --- Tranches effectifs
+// --- MAPPING TRANCHE UI -> BORNES D'EFFECTIF
 const employeeTrancheBounds = {
   "1-10":    [1, 10],
   "11-50":   [11, 50],
@@ -149,7 +159,7 @@ const codeRanges = {
   "NN": [null, null]
 };
 
-// GET /api/search-filters
+// --- SEARCH FILTERS (GET)
 app.get('/api/search-filters', async (req, res) => {
   console.log('📬 search-filters reçu avec params', req.query);
 
@@ -168,7 +178,6 @@ app.get('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
-  // SQL sans aucun "?" ni paramètre passé à db.all
   const sql = `
     SELECT *,
       CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
@@ -217,7 +226,7 @@ app.get('/api/search-filters', async (req, res) => {
   });
 });
 
-// POST /api/search-filters
+// --- SEARCH FILTERS (POST)
 app.post('/api/search-filters', async (req, res) => {
   const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
   const empRaw = String(req.body.employeesCategory || '').trim();
@@ -234,7 +243,6 @@ app.post('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'nafs, lng, lat, radius sont requis et valides' });
   }
 
-  // Génération de la clause IN (toujours aucun paramètre passé à db.all)
   const inList = nafs.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
   const sql = `
     SELECT *,
@@ -278,6 +286,7 @@ app.post('/api/search-filters', async (req, res) => {
   });
 });
 
+// --- PING ---
 app.get('/api/ping', (_req, res) => {
   res.json({ pong: true, ts: Date.now() });
 });
