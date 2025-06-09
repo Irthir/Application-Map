@@ -212,10 +212,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Label pour la section sélectionnée (affichage humain)
-  const selectedSectionLabel =
-    selectedSection
-      ? (sectionLabels[selectedSection] || nafSections.find(s => s.id === selectedSection)?.label)
-      : "";
+  //const selectedSectionLabel =
+  //  selectedSection
+  //    ? (sectionLabels[selectedSection] || nafSections.find(s => s.id === selectedSection)?.label)
+  //    : "";
 
   return (
     <div className="sidebar" style={{ height: "100vh", overflowY: "auto" }}>
@@ -239,6 +239,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <h2>Rechercher par catégorie</h2>
       <div className="filters">
+        {/* Sélection de la section */}
         <div className="filter-group">
           <label>Section</label>
           <select value={selectedSection} onChange={e => {
@@ -247,47 +248,84 @@ const Sidebar: React.FC<SidebarProps> = ({
             setNafSearch('');
           }}>
             <option value="">-- Toutes les sections --</option>
-            {nafSections.map(s => (
-              <option key={s.id} value={s.id}>{s.label}</option>
-            ))}
+            {nafSections.map((s, idx) => {
+              // Section code = index+1 sur 2 chiffres ("01", "02", ...)
+              const sectionCode = String(idx + 1).padStart(2, '0');
+              const label = sectionLabels[sectionCode] || s.label;
+              return (
+                <option key={s.id} value={s.id}>{label}</option>
+              );
+            })}
           </select>
         </div>
+
+        {/* Sélection activité */}
         <div className="filter-group">
           <label>Activités</label>
-          <input className="search" type="text" placeholder="Filtrer les activités..."
-            value={nafSearch} onChange={e => setNafSearch(e.target.value)} />
+          <input
+            className="search"
+            type="text"
+            placeholder="Filtrer les activités..."
+            value={nafSearch}
+            onChange={e => setNafSearch(e.target.value)}
+          />
           <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)}>
             <option value="">
               -- {selectedSection
-                ? `Rechercher sur toute la section ${selectedSectionLabel || selectedSection}`
+                ? `Rechercher sur toute la section ${(() => {
+                    // Affiche le vrai nom de la section
+                    const idx = nafSections.findIndex(s => s.id === selectedSection);
+                    const code = String(idx + 1).padStart(2, '0');
+                    return sectionLabels[code] || selectedSection;
+                  })()}`
                 : "Rechercher sur toute la Section"
               } --
             </option>
-            {filteredDivs.map(div => (
-              <optgroup key={div.id} label={sectionLabels[div.id] || div.label}>
-                {div.children.map(a => (
-                  <option key={a.id} value={a.id}>{a.label}</option>
-                ))}
-              </optgroup>
-            ))}
+            {filteredDivs.map((div, idx) => {
+              // Ici on synchronise aussi section code à partir de l'index
+              const sectionCode = String(idx + 1).padStart(2, '0');
+              const label = sectionLabels[sectionCode] || div.label;
+              return (
+                <optgroup key={div.id} label={label}>
+                  {div.children.map(a => (
+                    <option key={a.id} value={a.id}>{a.label}</option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </div>
+
+        {/* Effectifs */}
         <div className="filter-group">
           <label>Effectifs</label>
           <select value={employeesCategory} onChange={e => setEmployeesCategory(e.target.value)}>
             {employeeBuckets.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
+
+        {/* Rayon */}
         <div className="slider-group">
           <span>Rayon : {radius} km</span>
-          <input type="range" min={5} max={50} value={radius}
-            onChange={e => onRadiusChange(+e.target.value)} />
+          <input
+            type="range"
+            min={5}
+            max={50}
+            value={radius}
+            onChange={e => onRadiusChange(+e.target.value)}
+          />
         </div>
-        <button className="btn-primary" onClick={handleFilterClick}
-          disabled={filterLoading || (!(selectedSection && selectedSectionCodes.length) && !selectedActivity)}>
+
+        {/* Bouton recherche */}
+        <button
+          className="btn-primary"
+          onClick={handleFilterClick}
+          disabled={filterLoading || (!(selectedSection && selectedSectionCodes.length) && !selectedActivity)}
+        >
           {filterLoading ? 'Recherche...' : 'Lancer la recherche'}
         </button>
       </div>
+
 
       <div className="user-list">
         <h2>Clients & Prospects</h2>
