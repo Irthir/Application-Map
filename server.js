@@ -115,23 +115,29 @@ app.get('/api/search', async (req, res) => {
   });
   const whereClause = where.length ? where.join(' AND ') : '1=1';
 
-  // Détecte si c’est potentiellement un SIREN à 9 chiffres
-  const isSiren = /^\d{9}$/.test(termRaw);
-
+  // On prépare la requête SANS le OR siren, on l'ajoute si nécessaire
   let sql = `
     SELECT siren, name, codeNAF, employeesCategory, address, position
     FROM ${TABLE}
     WHERE (${whereClause})
   `;
+
+  // Détecte si termRaw est un SIREN à 9 chiffres (uniquement chiffres)
+  const isSiren = /^\d{9}$/.test(termRaw);
+
   if (isSiren) {
     sql += ` OR siren = ?`;
     params.push(termRaw);
   }
+
   sql += ` LIMIT 5`;
+
+  // DEBUG pour traquer le bug de param count
+  // console.log({sql, params, whereClause, isSiren, termRaw, words});
 
   db.all(sql, params, async (err, rows) => {
     if (err) {
-      console.error('DuckDB /search error:', err);
+      console.error('DuckDB /search error:', err, '\nSQL:', sql, '\nParams:', params);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
     }
     const parsed = rows
