@@ -11,11 +11,9 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-// --- MOTHERDUCK / DUCKDB SETUP ---
 const db = new duckdb.Database('md:');
 const TABLE = 'entreprises';
 
-// --- CONFIG MAPBOX GEOCODING ---
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJjbTc0aTR0aGcwYTJqMnFxeWdnN2N1NTRiIn0.UA9uEMwBO-JpQAkiutk_lg';
 if (!MAPBOX_TOKEN) {
   console.warn('⚠️ MAPBOX_TOKEN non défini – la géolocalisation par adresse tombera toujours sur Paris');
@@ -57,7 +55,6 @@ function isCompleteEntreprise(e) {
     && !Number.isNaN(lng) && !Number.isNaN(lat);
 }
 
-// Parse "[lng,lat]" string to [lng,lat]
 function parsePosition(raw) {
   if (Array.isArray(raw)) return raw;
   const [lng, lat] = String(raw)
@@ -67,7 +64,6 @@ function parsePosition(raw) {
   return [lng, lat];
 }
 
-// GET /api/all — toutes les entreprises complètes, géocodées
 app.get('/api/all', async (_req, res) => {
   try {
     const sql = `
@@ -91,7 +87,6 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
-// GET /api/search?term=… — jusqu’à 5 suggestions texte, géocodées
 app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
@@ -127,7 +122,7 @@ app.get('/api/search', async (req, res) => {
   });
 });
 
-// --- MAPPING TRANCHE UI -> BORNES D'EFFECTIF ---
+// --- Tranches effectifs
 const employeeTrancheBounds = {
   "1-10":    [1, 10],
   "11-50":   [11, 50],
@@ -154,7 +149,7 @@ const codeRanges = {
   "NN": [null, null]
 };
 
-// GET /api/search-filters?naf=…&employeesCategory=…&radius=…&lng=…&lat=…
+// GET /api/search-filters
 app.get('/api/search-filters', async (req, res) => {
   console.log('📬 search-filters reçu avec params', req.query);
 
@@ -164,7 +159,6 @@ app.get('/api/search-filters', async (req, res) => {
   const lng = Number(req.query.lng);
   const lat = Number(req.query.lat);
 
-  // Validation stricte de tous les paramètres !
   if (
     !nafRaw ||
     isNaN(radius) || radius <= 0 ||
@@ -174,27 +168,30 @@ app.get('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
-  // Correction ici : extraire lon/lat de la colonne position (format string "[lon,lat]")
+  // SQL sans aucun "?"
   const sql = `
-    SELECT *
-    FROM (
-      SELECT *,
-        CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
-        CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) AS lat,
-        6371 * ACOS(
-          COS(${lat} * PI() / 180)
-          * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
-          * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
-          + SIN(${lat} * PI() / 180)
-          * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
-        ) AS distance_km
-      FROM ${TABLE}
-      WHERE codeNAF LIKE ?
-    ) AS t
-    WHERE distance_km <= ?
+    SELECT *,
+      CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
+      CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) AS lat,
+      6371 * ACOS(
+        COS(${lat} * PI() / 180)
+        * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+        * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
+        + SIN(${lat} * PI() / 180)
+        * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+      ) AS distance_km
+    FROM ${TABLE}
+    WHERE codeNAF LIKE '${nafRaw}%'
+      AND 6371 * ACOS(
+        COS(${lat} * PI() / 180)
+        * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+        * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
+        + SIN(${lat} * PI() / 180)
+        * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+      ) <= ${radius}
     LIMIT 1000
   `;
-  db.all(sql, [nafRaw + '%', radius], async (err, rows) => {
+  db.all(sql, [], async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
@@ -220,7 +217,7 @@ app.get('/api/search-filters', async (req, res) => {
   });
 });
 
-// POST /api/search-filters — recherche par plusieurs codes NAF
+// POST /api/search-filters
 app.post('/api/search-filters', async (req, res) => {
   const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
   const empRaw = String(req.body.employeesCategory || '').trim();
@@ -228,7 +225,6 @@ app.post('/api/search-filters', async (req, res) => {
   const lng = Number(req.body.lng);
   const lat = Number(req.body.lat);
 
-  // Validation stricte
   if (
     !nafs.length ||
     isNaN(radius) || radius <= 0 ||
@@ -238,27 +234,32 @@ app.post('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'nafs, lng, lat, radius sont requis et valides' });
   }
 
-  const placeholders = nafs.map(() => '?').join(',');
+  // Génération de la clause IN
+  const inList = nafs.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
   const sql = `
-    SELECT *
-    FROM (
-      SELECT *,
-        CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
-        CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) AS lat,
-        6371 * ACOS(
-          COS(${lat} * PI() / 180)
-          * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
-          * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
-          + SIN(${lat} * PI() / 180)
-          * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
-        ) AS distance_km
-      FROM ${TABLE}
-      WHERE codeNAF IN (${placeholders})
-    ) AS t
-    WHERE distance_km <= ?
+    SELECT *,
+      CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
+      CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) AS lat,
+      6371 * ACOS(
+        COS(${lat} * PI() / 180)
+        * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+        * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
+        + SIN(${lat} * PI() / 180)
+        * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+      ) AS distance_km
+    FROM ${TABLE}
+    WHERE codeNAF IN (${inList})
+      AND 6371 * ACOS(
+        COS(${lat} * PI() / 180)
+        * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+        * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
+        + SIN(${lat} * PI() / 180)
+        * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+      ) <= ${radius}
     LIMIT 1000
   `;
-  db.all(sql, [...nafs.map(String), radius], async (err, rows) => {
+
+  db.all(sql, [], async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
@@ -277,7 +278,6 @@ app.post('/api/search-filters', async (req, res) => {
   });
 });
 
-// Endpoint ping pour réveil rapide
 app.get('/api/ping', (_req, res) => {
   res.json({ pong: true, ts: Date.now() });
 });
