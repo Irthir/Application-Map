@@ -157,14 +157,21 @@ const codeRanges = {
 // GET /api/search-filters?naf=…&employeesCategory=…&radius=…&lng=…&lat=…
 app.get('/api/search-filters', async (req, res) => {
   console.log('📬 search-filters reçu avec params', req.query);
+
   const nafRaw = String(req.query.naf || '').trim();
   const empRaw = String(req.query.employeesCategory || '').trim();
   const radius = Number(req.query.radius || 20);
   const lng = Number(req.query.lng);
   const lat = Number(req.query.lat);
 
-  if (!nafRaw || isNaN(lng) || isNaN(lat)) {
-    return res.status(400).json({ error: 'naf, lng, lat sont requis' });
+  // Validation stricte de tous les paramètres !
+  if (
+    !nafRaw ||
+    isNaN(radius) || radius <= 0 ||
+    isNaN(lng) ||
+    isNaN(lat)
+  ) {
+    return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
   const sql = `
@@ -184,8 +191,7 @@ app.get('/api/search-filters', async (req, res) => {
     WHERE distance_km <= ?
     LIMIT 1000
   `;
-  // Il y a exactement 2 ? : [codeNAF, radius]
-  db.all(sql, [String(nafRaw) + '%', Number(radius)], async (err, rows) => {
+  db.all(sql, [nafRaw + '%', radius], async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
@@ -213,14 +219,21 @@ app.get('/api/search-filters', async (req, res) => {
 
 // POST /api/search-filters — recherche par plusieurs codes NAF
 app.post('/api/search-filters', async (req, res) => {
-  const nafs = req.body.nafs;
+  // On filtre d'abord toutes les valeurs falsy (null, "", undefined) dans le tableau
+  const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
   const empRaw = String(req.body.employeesCategory || '').trim();
   const radius = Number(req.body.radius || 20);
   const lng = Number(req.body.lng);
   const lat = Number(req.body.lat);
 
-  if (!nafs || !Array.isArray(nafs) || !nafs.length || isNaN(lng) || isNaN(lat)) {
-    return res.status(400).json({ error: 'nafs, lng, lat sont requis' });
+  // Validation stricte
+  if (
+    !nafs.length ||
+    isNaN(radius) || radius <= 0 ||
+    isNaN(lng) ||
+    isNaN(lat)
+  ) {
+    return res.status(400).json({ error: 'nafs, lng, lat, radius sont requis et valides' });
   }
 
   const placeholders = nafs.map(() => '?').join(',');
@@ -241,8 +254,7 @@ app.post('/api/search-filters', async (req, res) => {
     WHERE distance_km <= ?
     LIMIT 1000
   `;
-  // nombre de ? = nafs.length + 1 (le +1 c'est le radius)
-  db.all(sql, [...nafs.map(String), Number(radius)], async (err, rows) => {
+  db.all(sql, [...nafs.map(String), radius], async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
