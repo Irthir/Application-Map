@@ -113,30 +113,23 @@ app.get('/api/search', async (req, res) => {
     where.push(`(LOWER(name) LIKE ? OR LOWER(address) LIKE ?)`);
     params.push(`%${word}%`, `%${word}%`);
   });
+  const whereClause = where.length ? where.join(' AND ') : '1=1';
 
-  let whereClause = where.length ? where.join(' AND ') : '1=1';
+  // Détecte si c’est potentiellement un SIREN à 9 chiffres
+  const isSiren = /^\d{9}$/.test(termRaw);
 
-  // Optionnel : on ajoute la clause SIREN si ça ressemble à un siren
-  let sql, paramsFinal;
-  if (/^\d{9}$/.test(termRaw)) {
-    sql = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
-      FROM ${TABLE}
-      WHERE (${whereClause}) OR siren = ?
-      LIMIT 5
-    `;
-    paramsFinal = [...params, termRaw];
-  } else {
-    sql = `
-      SELECT siren, name, codeNAF, employeesCategory, address, position
-      FROM ${TABLE}
-      WHERE (${whereClause})
-      LIMIT 5
-    `;
-    paramsFinal = params;
+  let sql = `
+    SELECT siren, name, codeNAF, employeesCategory, address, position
+    FROM ${TABLE}
+    WHERE (${whereClause})
+  `;
+  if (isSiren) {
+    sql += ` OR siren = ?`;
+    params.push(termRaw);
   }
+  sql += ` LIMIT 5`;
 
-  db.all(sql, paramsFinal, async (err, rows) => {
+  db.all(sql, params, async (err, rows) => {
     if (err) {
       console.error('DuckDB /search error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
