@@ -106,39 +106,34 @@ app.get('/api/search', async (req, res) => {
   if (!termRaw) return res.json([]);
 
   const words = termRaw.split(/\s+/).filter(Boolean);
-
   let where = [];
   let params = [];
   words.forEach(word => {
-    where.push(`(LOWER(name) LIKE ? OR LOWER(address) LIKE ?)`);
+    where.push('(LOWER(name) LIKE ? OR LOWER(address) LIKE ?)');
     params.push(`%${word}%`, `%${word}%`);
   });
-  const whereClause = where.length ? where.join(' AND ') : '1=1';
+  let whereClause = where.length ? where.join(' AND ') : '1=1';
 
-  // On prépare la requête SANS le OR siren, on l'ajoute si nécessaire
-  let sql = `
-    SELECT siren, name, codeNAF, employeesCategory, address, position
-    FROM ${TABLE}
-    WHERE (${whereClause})
-  `;
-
-  // Détecte si termRaw est un SIREN à 9 chiffres (uniquement chiffres)
+  // Vérification SIREN
   const isSiren = /^\d{9}$/.test(termRaw);
 
+  let sql = 'SELECT siren, name, codeNAF, employeesCategory, address, position FROM ' + TABLE + ' WHERE (' + whereClause + ')';
   if (isSiren) {
-    sql += ` OR siren = ?`;
+    sql += ' OR siren = ?';
     params.push(termRaw);
   }
+  sql += ' LIMIT 5';
 
-  sql += ` LIMIT 5`;
-
-  // DEBUG pour traquer le bug de param count
-  // console.log({sql, params, whereClause, isSiren, termRaw, words});
+  // DEBUG
+  console.log('\n--- /api/search SQL DEBUG ---');
+  console.log('SQL:', sql);
+  console.log('Params:', params);
+  console.log('TermRaw:', termRaw, 'Words:', words);
 
   db.all(sql, params, async (err, rows) => {
     if (err) {
       console.error('DuckDB /search error:', err, '\nSQL:', sql, '\nParams:', params);
-      return res.status(500).json({ error: 'Erreur interne DuckDB' });
+      return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
     const parsed = rows
       .map(e => ({ ...e, position: parsePosition(e.position) }))
@@ -147,6 +142,7 @@ app.get('/api/search', async (req, res) => {
     res.json(enriched);
   });
 });
+
 
 // --- MAPPING TRANCHE UI -> BORNES D'EFFECTIF
 const employeeTrancheBounds = {
