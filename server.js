@@ -168,7 +168,7 @@ app.get('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
-  // SQL sans aucun "?"
+  // SQL sans aucun "?" ni paramètre passé à db.all
   const sql = `
     SELECT *,
       CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
@@ -191,7 +191,7 @@ app.get('/api/search-filters', async (req, res) => {
       ) <= ${radius}
     LIMIT 1000
   `;
-  db.all(sql, [], async (err, rows) => {
+  db.all(sql, async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
@@ -234,7 +234,7 @@ app.post('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'nafs, lng, lat, radius sont requis et valides' });
   }
 
-  // Génération de la clause IN
+  // Génération de la clause IN (toujours aucun paramètre passé à db.all)
   const inList = nafs.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
   const sql = `
     SELECT *,
@@ -259,7 +259,7 @@ app.post('/api/search-filters', async (req, res) => {
     LIMIT 1000
   `;
 
-  db.all(sql, [], async (err, rows) => {
+  db.all(sql, async (err, rows) => {
     if (err) {
       console.error('DuckDB /search-filters error:', err);
       return res.status(500).json({ error: 'Erreur interne DuckDB' });
