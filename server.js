@@ -168,17 +168,20 @@ app.get('/api/search-filters', async (req, res) => {
   }
 
   const sql = `
-    SELECT *,
-      6371 * ACOS(
-        COS(${lat} * PI() / 180)
-        * COS(lat * PI() / 180)
-        * COS((lon - ${lng}) * PI() / 180)
-        + SIN(${lat} * PI() / 180)
-        * SIN(lat * PI() / 180)
-      ) AS distance_km
-    FROM ${TABLE}
-    WHERE codeNAF LIKE ?
-    HAVING distance_km <= ?
+    SELECT *
+    FROM (
+      SELECT *,
+        6371 * ACOS(
+          COS(${lat} * PI() / 180)
+          * COS(lat * PI() / 180)
+          * COS((lon - ${lng}) * PI() / 180)
+          + SIN(${lat} * PI() / 180)
+          * SIN(lat * PI() / 180)
+        ) AS distance_km
+      FROM ${TABLE}
+      WHERE codeNAF LIKE ?
+    ) AS t
+    WHERE distance_km <= ?
     LIMIT 1000
   `;
   db.all(sql, [`${nafRaw}%`, radius], async (err, rows) => {
@@ -221,17 +224,20 @@ app.post('/api/search-filters', async (req, res) => {
 
   const placeholders = nafs.map(() => '?').join(',');
   const sql = `
-    SELECT *,
-      6371 * ACOS(
-        COS(${lat} * PI() / 180)
-        * COS(lat * PI() / 180)
-        * COS((lon - ${lng}) * PI() / 180)
-        + SIN(${lat} * PI() / 180)
-        * SIN(lat * PI() / 180)
-      ) AS distance_km
-    FROM ${TABLE}
-    WHERE codeNAF IN (${placeholders})
-    HAVING distance_km <= ?
+    SELECT *
+    FROM (
+      SELECT *,
+        6371 * ACOS(
+          COS(${lat} * PI() / 180)
+          * COS(lat * PI() / 180)
+          * COS((lon - ${lng}) * PI() / 180)
+          + SIN(${lat} * PI() / 180)
+          * SIN(lat * PI() / 180)
+        ) AS distance_km
+      FROM ${TABLE}
+      WHERE codeNAF IN (${placeholders})
+    ) AS t
+    WHERE distance_km <= ?
     LIMIT 1000
   `;
   db.all(sql, [...nafs, radius], async (err, rows) => {
