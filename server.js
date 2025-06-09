@@ -105,34 +105,23 @@ app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
 
-  const words = termRaw.split(/\s+/).filter(Boolean);
-  let where = [];
-  let params = [];
-  words.forEach(word => {
-    where.push('(LOWER(name) LIKE ? OR LOWER(address) LIKE ?)');
-    params.push(`%${word}%`, `%${word}%`);
-  });
-  let whereClause = where.length ? where.join(' AND ') : '1=1';
+  // Clean et échappe les guillemets simples
+  const safeTerm = termRaw.replace(/'/g, "''");
 
-  // Vérification SIREN
-  const isSiren = /^\d{9}$/.test(termRaw);
+  const sql = `
+    SELECT siren, name, codeNAF, employeesCategory, address, position
+    FROM ${TABLE}
+    WHERE LOWER(name) LIKE '%${safeTerm}%'
+       OR LOWER(address) LIKE '%${safeTerm}%'
+       OR siren LIKE '%${safeTerm}%'
+    LIMIT 5
+  `;
 
-  let sql = 'SELECT siren, name, codeNAF, employeesCategory, address, position FROM ' + TABLE + ' WHERE (' + whereClause + ')';
-  if (isSiren) {
-    sql += ' OR siren = ?';
-    params.push(termRaw);
-  }
-  sql += ' LIMIT 5';
+  console.log('SQL recherche:', sql);
 
-  // DEBUG
-  console.log('\n--- /api/search SQL DEBUG ---');
-  console.log('SQL:', sql);
-  console.log('Params:', params);
-  console.log('TermRaw:', termRaw, 'Words:', words);
-
-  db.all(sql, params, async (err, rows) => {
+  db.all(sql, async (err, rows) => {
     if (err) {
-      console.error('DuckDB /search error:', err, '\nSQL:', sql, '\nParams:', params);
+      console.error('DuckDB /search error:', err, '\nSQL:', sql);
       return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
     const parsed = rows
