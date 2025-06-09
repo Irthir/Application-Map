@@ -2,7 +2,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import fetch from 'node-fetch'; // npm install node-fetch
+import fetch from 'node-fetch';
 import duckdb from 'duckdb';
 
 const app = express();
@@ -174,16 +174,19 @@ app.get('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
+  // Correction ici : extraire lon/lat de la colonne position (format string "[lon,lat]")
   const sql = `
     SELECT *
     FROM (
       SELECT *,
+        CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
+        CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) AS lat,
         6371 * ACOS(
           COS(${lat} * PI() / 180)
-          * COS(lat * PI() / 180)
-          * COS((lon - ${lng}) * PI() / 180)
+          * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+          * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
           + SIN(${lat} * PI() / 180)
-          * SIN(lat * PI() / 180)
+          * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
         ) AS distance_km
       FROM ${TABLE}
       WHERE codeNAF LIKE ?
@@ -219,7 +222,6 @@ app.get('/api/search-filters', async (req, res) => {
 
 // POST /api/search-filters — recherche par plusieurs codes NAF
 app.post('/api/search-filters', async (req, res) => {
-  // On filtre d'abord toutes les valeurs falsy (null, "", undefined) dans le tableau
   const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
   const empRaw = String(req.body.employeesCategory || '').trim();
   const radius = Number(req.body.radius || 20);
@@ -241,12 +243,14 @@ app.post('/api/search-filters', async (req, res) => {
     SELECT *
     FROM (
       SELECT *,
+        CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) AS lon,
+        CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) AS lat,
         6371 * ACOS(
           COS(${lat} * PI() / 180)
-          * COS(lat * PI() / 180)
-          * COS((lon - ${lng}) * PI() / 180)
+          * COS(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
+          * COS((CAST(SPLIT_PART(SPLIT_PART(position, ',', 1), '[', 2) AS DOUBLE) - ${lng}) * PI() / 180)
           + SIN(${lat} * PI() / 180)
-          * SIN(lat * PI() / 180)
+          * SIN(CAST(SPLIT_PART(SPLIT_PART(position, ',', 2), ']', 1) AS DOUBLE) * PI() / 180)
         ) AS distance_km
       FROM ${TABLE}
       WHERE codeNAF IN (${placeholders})
