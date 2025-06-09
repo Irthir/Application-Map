@@ -2,14 +2,18 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import fetch from 'node-fetch';               // npm install node-fetch
-import { BigQuery } from '@google-cloud/bigquery';
+import fetch from 'node-fetch'; // npm install node-fetch
+import duckdb from 'duckdb';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+
+// --- MOTHERDUCK / DUCKDB SETUP ---
+const db = new duckdb.Database('md:');
+const TABLE = 'entreprises';
 
 // --- CONFIG MAPBOX GEOCODING ---
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJjbTc0aTR0aGcwYTJqMnFxeWdnN2N1NTRiIn0.UA9uEMwBO-JpQAkiutk_lg';
@@ -20,7 +24,6 @@ const geoCache = new Map();
 
 async function ensureCoords(e) {
   const [lng0, lat0] = e.position;
-  // si on n’est pas sur Paris (valeur par défaut) ou pas d’adresse, on laisse tel quel
   if (!(lng0 === 2.3522 && lat0 === 48.8566) || !e.address) {
     return e;
   }
@@ -29,7 +32,7 @@ async function ensureCoords(e) {
   }
   try {
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/`
-              + `${encodeURIComponent(e.address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
+      + `${encodeURIComponent(e.address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
     const resp = await fetch(url);
     if (resp.ok) {
       const js = await resp.json();
@@ -45,22 +48,18 @@ async function ensureCoords(e) {
   return e;
 }
 
-// --- BigQuery setup ---
-const bq = new BigQuery({ projectId: process.env.GCP_PROJECT_ID });
-const TABLE_ID = '`application-map-458717.sirene_data.entreprises_fusion_final`';
-
-// filtre les entreprises incomplètes
 function isCompleteEntreprise(e) {
   if (!e.name?.trim()) return false;
   if (!e.employeesCategory) return false;
   if (!Array.isArray(e.position) || e.position.length !== 2) return false;
   const [lng, lat] = e.position;
   return typeof lng === 'number' && typeof lat === 'number'
-      && !Number.isNaN(lng) && !Number.isNaN(lat);
+    && !Number.isNaN(lng) && !Number.isNaN(lat);
 }
 
-// lit la chaîne "[lng,lat]" et renvoie [lng, lat]
+// Parse "[lng,lat]" string to [lng,lat]
 function parsePosition(raw) {
+  if (Array.isArray(raw)) return raw;
   const [lng, lat] = String(raw)
     .replace(/[\[\]\s]/g, '')
     .split(',')
@@ -71,22 +70,24 @@ function parsePosition(raw) {
 // GET /api/all — toutes les entreprises complètes, géocodées
 app.get('/api/all', async (_req, res) => {
   try {
-    const query = `
+    const sql = `
       SELECT siren, name, codeNAF, employeesCategory, address, position
-      FROM ${TABLE_ID}
+      FROM ${TABLE}
     `;
-    const [job] = await bq.createQueryJob({ query });
-    const [rows] = await job.getQueryResults();
-
-    const parsed = rows
-      .map(e => ({ ...e, position: parsePosition(e.position) }))
-      .filter(isCompleteEntreprise);
-
-    const enriched = await Promise.all(parsed.map(ensureCoords));
-    res.json(enriched);
+    db.all(sql, async (err, rows) => {
+      if (err) {
+        console.error('DuckDB /all error:', err);
+        return res.status(500).json({ error: 'Erreur interne DuckDB' });
+      }
+      const parsed = rows
+        .map(e => ({ ...e, position: parsePosition(e.position) }))
+        .filter(isCompleteEntreprise);
+      const enriched = await Promise.all(parsed.map(ensureCoords));
+      res.json(enriched);
+    });
   } catch (err) {
-    console.error('BigQuery /all error:', err);
-    res.status(500).json({ error: 'Erreur interne BigQuery' });
+    console.error('DuckDB /all error:', err);
+    res.status(500).json({ error: 'Erreur interne DuckDB' });
   }
 });
 
@@ -97,45 +98,36 @@ app.get('/api/search', async (req, res) => {
 
   const words = termRaw.split(/\s+/).filter(Boolean);
 
-  let nameAddressClauses = [];
-  let params = {};
-  words.forEach((word, idx) => {
-    nameAddressClauses.push(`(LOWER(name) LIKE @w${idx} OR LOWER(address) LIKE @w${idx})`);
-    params[`w${idx}`] = `%${word}%`;
+  let where = [];
+  let params = [];
+  words.forEach(word => {
+    where.push(`(LOWER(name) LIKE ? OR LOWER(address) LIKE ?)`);
+    params.push(`%${word}%`, `%${word}%`);
   });
+  const whereClause = where.length ? where.join(' AND ') : '1=1';
 
-  // Met SIREN dans un OR global, pas AND
-  const nameAddressConds = nameAddressClauses.length ? nameAddressClauses.join(' AND ') : '1=1';
-  const where = `(${nameAddressConds}) OR siren = @term`;
-  params.term = termRaw;
-
-  const query = `
+  const sql = `
     SELECT siren, name, codeNAF, employeesCategory, address, position
-    FROM ${TABLE_ID}
-    WHERE ${where}
+    FROM ${TABLE}
+    WHERE (${whereClause}) OR siren = ?
     LIMIT 5
   `;
+  params.push(termRaw);
 
-  try {
-    const options = { query, params };
-    const [job] = await bq.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
+  db.all(sql, params, async (err, rows) => {
+    if (err) {
+      console.error('DuckDB /search error:', err);
+      return res.status(500).json({ error: 'Erreur interne DuckDB' });
+    }
     const parsed = rows
       .map(e => ({ ...e, position: parsePosition(e.position) }))
       .filter(isCompleteEntreprise);
-
     const enriched = await Promise.all(parsed.map(ensureCoords));
     res.json(enriched);
-  } catch (err) {
-    console.error('BigQuery /search error:', err);
-    res.status(500).json({ error: 'Erreur interne BigQuery' });
-  }
+  });
 });
 
-// ... (tout le haut de server.js inchangé)
-
-// MAPPING TRANCHE UI -> BORNES D'EFFECTIF
+// --- MAPPING TRANCHE UI -> BORNES D'EFFECTIF ---
 const employeeTrancheBounds = {
   "1-10":    [1, 10],
   "11-50":   [11, 50],
@@ -143,7 +135,6 @@ const employeeTrancheBounds = {
   "201-500": [201, 500],
   "501+":    [501, 100000]
 };
-// MAPPING CODE SIRENE -> BORNES
 const codeRanges = {
   "00": [0, 0],
   "01": [1, 2],
@@ -176,63 +167,25 @@ app.get('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'naf, lng, lat sont requis' });
   }
 
-  try {
-    // La requête SQL NE FILTRE PAS sur employeesCategory (pour tous les résultats de la zone/rayon)
-    const query = `
-      WITH entreprises AS (
-        SELECT
-          siren,
-          name,
-          codeNAF,
-          employeesCategory,
-          address,
-          position,
-          lon,
-          lat,
-          (
-            6371 * ACOS(
-              COS(@lat * 3.141592653589793 / 180)
-              * COS(lat * 3.141592653589793 / 180)
-              * COS((lon - @lng) * 3.141592653589793 / 180)
-              + SIN(@lat * 3.141592653589793 / 180)
-              * SIN(lat * 3.141592653589793 / 180)
-            )
-          ) AS distance_km
-        FROM application-map-458717.sirene_data.entreprises_fusion_final
-        WHERE codeNAF LIKE @naf
-          AND (
-            6371 * ACOS(
-              COS(@lat * 3.141592653589793 / 180)
-              * COS(lat * 3.141592653589793 / 180)
-              * COS((lon - @lng) * 3.141592653589793 / 180)
-              + SIN(@lat * 3.141592653589793 / 180)
-              * SIN(lat * 3.141592653589793 / 180)
-            ) <= @radius
-          )
-      )
-      SELECT *
-      FROM (
-        SELECT
-          *,
-          ROW_NUMBER() OVER (PARTITION BY siren ORDER BY distance_km ASC) AS rn
-        FROM entreprises
-      )
-      WHERE rn = 1
-      LIMIT 1000
-    `;
-    const options = {
-      query,
-      params: {
-        naf: `${nafRaw}%`,
-        radius,
-        lng,
-        lat,
-      }
-    };
-    const [job] = await bq.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
-    // Parse et enrichit comme d'habitude
+  const sql = `
+    SELECT *,
+      6371 * ACOS(
+        COS(${lat} * PI() / 180)
+        * COS(lat * PI() / 180)
+        * COS((lon - ${lng}) * PI() / 180)
+        + SIN(${lat} * PI() / 180)
+        * SIN(lat * PI() / 180)
+      ) AS distance_km
+    FROM ${TABLE}
+    WHERE codeNAF LIKE ?
+    HAVING distance_km <= ?
+    LIMIT 1000
+  `;
+  db.all(sql, [`${nafRaw}%`, radius], async (err, rows) => {
+    if (err) {
+      console.error('DuckDB /search-filters error:', err);
+      return res.status(500).json({ error: 'Erreur interne DuckDB' });
+    }
     const parsed = rows
       .map(e => ({
         ...e,
@@ -240,29 +193,21 @@ app.get('/api/search-filters', async (req, res) => {
       }))
       .filter(isCompleteEntreprise);
 
-    // ------ FILTRAGE EFFECTIF CÔTÉ JS SELON LA TRANCHE ------
     let filtered = parsed;
     if (empRaw && employeeTrancheBounds[empRaw]) {
       const [tMin, tMax] = employeeTrancheBounds[empRaw];
       filtered = parsed.filter(e => {
         const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
-        // Inclure uniquement si la plage du code recouvre au moins partiellement la tranche demandée
-        // (ou inverser la logique selon besoin)
         return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
       });
     }
-
     const enriched = await Promise.all(filtered.map(ensureCoords));
-    console.log('🔎 Résultats BigQuery:', enriched.length, 'entrées');
+    console.log('🔎 Résultats DuckDB:', enriched.length, 'entrées');
     res.json(enriched);
-  } catch (err) {
-    console.error('BigQuery /search-filters error:', err);
-    res.status(500).json({ error: 'Erreur interne BigQuery' });
-  }
+  });
 });
 
-
-// POST /api/search-filters — recherche par plusieurs codes NAF (pour la recherche par section)
+// POST /api/search-filters — recherche par plusieurs codes NAF
 app.post('/api/search-filters', async (req, res) => {
   const nafs = req.body.nafs;
   const empRaw = String(req.body.employeesCategory || '').trim();
@@ -274,66 +219,26 @@ app.post('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'nafs, lng, lat sont requis' });
   }
 
-  try {
-    const query = `
-      WITH entreprises AS (
-        SELECT
-          siren,
-          name,
-          codeNAF,
-          employeesCategory,
-          address,
-          position,
-          lon,
-          lat,
-          (
-            6371 * ACOS(
-              COS(@lat * 3.141592653589793 / 180)
-              * COS(lat * 3.141592653589793 / 180)
-              * COS((lon - @lng) * 3.141592653589793 / 180)
-              + SIN(@lat * 3.141592653589793 / 180)
-              * SIN(lat * 3.141592653589793 / 180)
-            )
-          ) AS distance_km
-        FROM application-map-458717.sirene_data.entreprises_fusion_final
-        WHERE codeNAF IN UNNEST(@nafs)
-          AND (
-            @emp = "" OR
-            employeesCategory = @emp OR employeesCategory IS NULL
-          )
-          AND (
-            6371 * ACOS(
-              COS(@lat * 3.141592653589793 / 180)
-              * COS(lat * 3.141592653589793 / 180)
-              * COS((lon - @lng) * 3.141592653589793 / 180)
-              + SIN(@lat * 3.141592653589793 / 180)
-              * SIN(lat * 3.141592653589793 / 180)
-            ) <= @radius
-          )
-      )
-      SELECT *
-      FROM (
-        SELECT
-          *,
-          ROW_NUMBER() OVER (PARTITION BY siren ORDER BY distance_km ASC) AS rn
-        FROM entreprises
-      )
-      WHERE rn = 1
-      LIMIT 1000
-    `;
-    const options = {
-      query,
-      params: {
-        nafs,
-        emp: empRaw,
-        radius,
-        lng,
-        lat,
-      }
-    };
-    const [job] = await bq.createQueryJob(options);
-    const [rows] = await job.getQueryResults();
-
+  const placeholders = nafs.map(() => '?').join(',');
+  const sql = `
+    SELECT *,
+      6371 * ACOS(
+        COS(${lat} * PI() / 180)
+        * COS(lat * PI() / 180)
+        * COS((lon - ${lng}) * PI() / 180)
+        + SIN(${lat} * PI() / 180)
+        * SIN(lat * PI() / 180)
+      ) AS distance_km
+    FROM ${TABLE}
+    WHERE codeNAF IN (${placeholders})
+    HAVING distance_km <= ?
+    LIMIT 1000
+  `;
+  db.all(sql, [...nafs, radius], async (err, rows) => {
+    if (err) {
+      console.error('DuckDB /search-filters error:', err);
+      return res.status(500).json({ error: 'Erreur interne DuckDB' });
+    }
     const parsed = rows
       .map(e => ({
         ...e,
@@ -343,12 +248,9 @@ app.post('/api/search-filters', async (req, res) => {
       .filter(isCompleteEntreprise);
 
     const enriched = await Promise.all(parsed.map(ensureCoords));
-    console.log('🔎 Résultats BigQuery (section):', enriched.length, 'entrées');
+    console.log('🔎 Résultats DuckDB (section):', enriched.length, 'entrées');
     res.json(enriched);
-  } catch (err) {
-    console.error('BigQuery /search-filters error:', err);
-    res.status(500).json({ error: 'Erreur interne BigQuery' });
-  }
+  });
 });
 
 // Endpoint ping pour réveil rapide
