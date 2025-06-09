@@ -63,6 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Recherche d'entreprise par nom/adresse/SIREN
   useEffect(() => {
     if (!searchText) {
       setSuggestions([]);
@@ -74,6 +75,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       .then((res: Entreprise[]) => setSuggestions(Array.isArray(res) ? res : []))
       .finally(() => setLoading(false));
   }, [searchText]);
+
+  // Vide les suggestions dès qu'une recherche par filtre (activité/secteur) est lancée
+  useEffect(() => {
+    if (filterLoading) setSuggestions([]);
+  }, [filterLoading]);
 
   const handleSearchSelect = (e: Entreprise) => {
     setSearchText('');
@@ -185,6 +191,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleFilterClick = async () => {
     setFilterLoading(true);
     try {
+      // Vider suggestions lors d'une recherche par filtre
+      setSuggestions([]);
       if (selectedSection && selectedSectionCodes.length) {
         await onFilterSearch({
           nafCodes: selectedSectionCodes,
@@ -202,6 +210,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       setFilterLoading(false);
     }
   };
+
+  // Label pour la section sélectionnée (affichage humain)
+  const selectedSectionLabel =
+    selectedSection
+      ? (sectionLabels[selectedSection] || nafSections.find(s => s.id === selectedSection)?.label)
+      : "";
 
   return (
     <div className="sidebar" style={{ height: "100vh", overflowY: "auto" }}>
@@ -243,9 +257,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           <input className="search" type="text" placeholder="Filtrer les activités..."
             value={nafSearch} onChange={e => setNafSearch(e.target.value)} />
           <select value={selectedActivity} onChange={e => setSelectedActivity(e.target.value)}>
-            <option value="">-- Rechercher sur toute la Section --</option>
+            <option value="">
+              -- {selectedSection
+                ? `Rechercher sur toute la section ${selectedSectionLabel || selectedSection}`
+                : "Rechercher sur toute la Section"
+              } --
+            </option>
             {filteredDivs.map(div => (
-              <optgroup key={div.id} label={div.label}>
+              <optgroup key={div.id} label={sectionLabels[div.id] || div.label}>
                 {div.children.map(a => (
                   <option key={a.id} value={a.id}>{a.label}</option>
                 ))}
@@ -311,13 +330,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/*<p style={{ margin: "12px 0", color: "#555", fontSize: "0.95em" }}>
-        <b>Format attendu :</b> CSV avec les colonnes&nbsp;:<br />
-        <code>siren, name, address, type, codeNAF, employeesCategory</code><br />
-        type = client | prospect&nbsp; | &nbsp;
-        employeesCategory = 1-10, 11-50, 51-200, 201-500, 501+<br />
-        codeNAF : optionnel (laisser vide si inconnu)
-      </p>*/}
       <button
         onClick={exportPatronImport}
         style={{
