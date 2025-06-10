@@ -212,8 +212,26 @@ app.get('/api/search-filters', async (req, res) => {
       console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
       return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
-    res.json(rows);
+    // On parse la position pour qu'elle devienne un vrai [lng, lat]
+    const formatted = rows.map(r => {
+      let pos;
+      try {
+        pos = JSON.parse(r.position);
+      } catch {
+        // Si pas un JSON valide, on ignore (ne renvoie pas l'objet)
+        return null;
+      }
+      // Si ce n'est pas un tableau à 2 nombres, on ignore
+      if (!Array.isArray(pos) || pos.length !== 2
+          || typeof pos[0] !== 'number' || typeof pos[1] !== 'number') {
+        return null;
+      }
+      return { ...r, position: pos };
+    }).filter(Boolean);
+
+    res.json(formatted);
   });
+
 });
 
 
@@ -266,8 +284,26 @@ app.post('/api/search-filters', async (req, res) => {
       console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
       return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
-    res.json(rows);
+    // On parse la position pour qu'elle devienne un vrai [lng, lat]
+    const formatted = rows.map(r => {
+      let pos;
+      try {
+        pos = JSON.parse(r.position);
+      } catch {
+        // Si pas un JSON valide, on ignore (ne renvoie pas l'objet)
+        return null;
+      }
+      // Si ce n'est pas un tableau à 2 nombres, on ignore
+      if (!Array.isArray(pos) || pos.length !== 2
+          || typeof pos[0] !== 'number' || typeof pos[1] !== 'number') {
+        return null;
+      }
+      return { ...r, position: pos };
+    }).filter(Boolean);
+
+    res.json(formatted);
   });
+
 });
 
 
