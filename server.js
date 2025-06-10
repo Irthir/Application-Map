@@ -160,99 +160,64 @@ const codeRanges = {
   "NN": [null, null]
 };
 
-// --- SEARCH FILTERS (GET) --- AVEC géocodage et filtrage JS
+// --- SEARCH FILTERS (GET) version SQL-only
 app.get('/api/search-filters', async (req, res) => {
-  console.log('📬 search-filters reçu avec params', req.query);
-
   const nafRaw = String(req.query.naf || '').trim();
   const empRaw = String(req.query.employeesCategory || '').trim();
   const radius = Number(req.query.radius || 20);
   const lng = Number(req.query.lng);
   const lat = Number(req.query.lat);
 
-  if (
-    !nafRaw ||
-    isNaN(radius) || radius <= 0 ||
-    isNaN(lng) ||
-    isNaN(lat)
-  ) {
+  if (!nafRaw || isNaN(radius) || radius <= 0 || isNaN(lng) || isNaN(lat)) {
     return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
-  // 1. On NE filtre que par code NAF en SQL
+  // On extrait longitude et latitude stockées dans le champ `position` (texte '[lng,lat]')
+  // puis on calcule la distance en km selon Haversine, on exclut le point par défaut et les NULL,
+  // et on ne garde que ceux dans le rayon.
   const sql = `
-    SELECT *, position, address, siren, employeesCategory
-    FROM ${TABLE}
-    WHERE codeNAF LIKE '${nafRaw}%'
-    LIMIT 3000
+    WITH coords AS (
+      SELECT
+        siren, name, codeNAF, employeesCategory, address, position,
+        CAST(split_part(trim(both '[]' FROM position), ',', 1) AS DOUBLE) AS lng2,
+        CAST(split_part(trim(both '[]' FROM position), ',', 2) AS DOUBLE) AS lat2
+      FROM ${TABLE}
+      WHERE position IS NOT NULL
+        AND position <> '[2.3522,48.8566]'
+        AND codeNAF LIKE '${nafRaw}%'
+    )
+    SELECT DISTINCT
+      siren, name, codeNAF, employeesCategory, address, position,
+      -- formule de Haversine :
+      6371 * 2 * ASIN(SQRT(
+        POWER(SIN(RADIANS(lat2 - ${lat}) / 2), 2) +
+        COS(RADIANS(${lat})) * COS(RADIANS(lat2)) *
+        POWER(SIN(RADIANS(lng2 - ${lng}) / 2), 2)
+      )) AS distance
+    FROM coords
+    WHERE distance <= ${radius}
+    ${empRaw && employeeTrancheBounds[empRaw] ? `
+      -- Filtre tranche d'effectif si demandé
+      AND (
+        CAST(split_part(employeesCategory, '', 1) AS INT) BETWEEN ${employeeTrancheBounds[empRaw][0]} 
+        AND ${employeeTrancheBounds[empRaw][1]}
+      )
+    ` : ''}
+    ORDER BY distance
+    LIMIT 3000;
   `;
 
-  db.all(sql, async (err, rows) => {
+  db.all(sql, (err, rows) => {
     if (err) {
-      console.error('DuckDB /search-filters error:', err);
-      return res.status(500).json({ error: 'Erreur interne DuckDB' });
+      console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
+      return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
-    // 2. On enrichit les coordonnées manquantes ou incomplètes
-    const enriched = await Promise.all(
-      rows.map(async e => {
-        let pos = parsePosition(e.position);
-        if (!pos || pos.length !== 2 || isNaN(pos[0]) || isNaN(pos[1]) ||
-            (pos[0] === 2.3522 && pos[1] === 48.8566)) {
-          const enrichedE = await ensureCoords({ ...e, position: pos, address: e.address });
-          // En tâche de fond : update la BDD si la position a été modifiée
-          if (
-            enrichedE.position && enrichedE.position.length === 2 &&
-            enrichedE.position[0] !== pos[0] && enrichedE.position[1] !== pos[1]
-          ) {
-            process.nextTick(() => {
-              db.run(
-                `UPDATE ${TABLE} SET position = '[${enrichedE.position[0]},${enrichedE.position[1]}]' WHERE siren = ?`,
-                [enrichedE.siren],
-                err => {
-                  if (err) console.warn("Échec update position pour", enrichedE.siren, err.message);
-                }
-              );
-            });
-          }
-          return enrichedE;
-        }
-        return { ...e, position: pos };
-      })
-    );
-
-    // 3. Refiltres manuellement PAR DISTANCE autour du centre choisi
-    const filtered = enriched
-      .filter(e => isCompleteEntreprise(e))
-      .filter(e => {
-        const [lng2, lat2] = e.position;
-        // Haversine
-        function toRad(d) { return d * Math.PI / 180; }
-        const R = 6371;
-        const dLat = toRad(lat2 - lat);
-        const dLng = toRad(lng2 - lng);
-        const a = Math.sin(dLat / 2) ** 2 +
-                  Math.cos(toRad(lat)) * Math.cos(toRad(lat2)) *
-                  Math.sin(dLng / 2) ** 2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const d = R * c;
-        return d <= radius;
-      });
-
-    // 4. Filtre encore selon l’effectif, si demandé
-    let filteredFinal = filtered;
-    if (empRaw && employeeTrancheBounds[empRaw]) {
-      const [tMin, tMax] = employeeTrancheBounds[empRaw];
-      filteredFinal = filtered.filter(e => {
-        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
-        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
-      });
-    }
-    console.log('🔎 Résultats filtrés (post-géocodage):', filteredFinal.length, 'entrées');
-    res.json(filteredFinal);
+    res.json(rows);
   });
 });
 
-// --- SEARCH FILTERS (POST) --- idem (multi-codes NAF)
+
+// --- SEARCH FILTERS (POST) version SQL-only
 app.post('/api/search-filters', async (req, res) => {
   const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
   const empRaw = String(req.body.employeesCategory || '').trim();
@@ -260,87 +225,51 @@ app.post('/api/search-filters', async (req, res) => {
   const lng = Number(req.body.lng);
   const lat = Number(req.body.lat);
 
-  if (
-    !nafs.length ||
-    isNaN(radius) || radius <= 0 ||
-    isNaN(lng) ||
-    isNaN(lat)
-  ) {
+  if (!nafs.length || isNaN(radius) || radius <= 0 || isNaN(lng) || isNaN(lat)) {
     return res.status(400).json({ error: 'nafs, lng, lat, radius sont requis et valides' });
   }
 
   const inList = nafs.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+
   const sql = `
-    SELECT *, position, address, siren, employeesCategory
-    FROM ${TABLE}
-    WHERE codeNAF IN (${inList})
-    LIMIT 3000
+    WITH coords AS (
+      SELECT
+        siren, name, codeNAF, employeesCategory, address, position,
+        CAST(split_part(trim(both '[]' FROM position), ',', 1) AS DOUBLE) AS lng2,
+        CAST(split_part(trim(both '[]' FROM position), ',', 2) AS DOUBLE) AS lat2
+      FROM ${TABLE}
+      WHERE position IS NOT NULL
+        AND position <> '[2.3522,48.8566]'
+        AND codeNAF IN (${inList})
+    )
+    SELECT DISTINCT
+      siren, name, codeNAF, employeesCategory, address, position,
+      6371 * 2 * ASIN(SQRT(
+        POWER(SIN(RADIANS(lat2 - ${lat}) / 2), 2) +
+        COS(RADIANS(${lat})) * COS(RADIANS(lat2)) *
+        POWER(SIN(RADIANS(lng2 - ${lng}) / 2), 2)
+      )) AS distance
+    FROM coords
+    WHERE distance <= ${radius}
+    ${empRaw && employeeTrancheBounds[empRaw] ? `
+      AND (
+        CAST(split_part(employeesCategory, '', 1) AS INT) BETWEEN ${employeeTrancheBounds[empRaw][0]} 
+        AND ${employeeTrancheBounds[empRaw][1]}
+      )
+    ` : ''}
+    ORDER BY distance
+    LIMIT 3000;
   `;
 
-  db.all(sql, async (err, rows) => {
+  db.all(sql, (err, rows) => {
     if (err) {
-      console.error('DuckDB /search-filters error:', err);
-      return res.status(500).json({ error: 'Erreur interne DuckDB' });
+      console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
+      return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
-    // 2. On enrichit les coordonnées manquantes ou incomplètes
-    const enriched = await Promise.all(
-      rows.map(async e => {
-        let pos = parsePosition(e.position);
-        if (!pos || pos.length !== 2 || isNaN(pos[0]) || isNaN(pos[1]) ||
-            (pos[0] === 2.3522 && pos[1] === 48.8566)) {
-          const enrichedE = await ensureCoords({ ...e, position: pos, address: e.address });
-          // En tâche de fond : update la BDD si la position a été modifiée
-          if (
-            enrichedE.position && enrichedE.position.length === 2 &&
-            enrichedE.position[0] !== pos[0] && enrichedE.position[1] !== pos[1]
-          ) {
-            process.nextTick(() => {
-              db.run(
-                `UPDATE ${TABLE} SET position = '[${enrichedE.position[0]},${enrichedE.position[1]}]' WHERE siren = ?`,
-                [enrichedE.siren],
-                err => {
-                  if (err) console.warn("Échec update position pour", enrichedE.siren, err.message);
-                }
-              );
-            });
-          }
-          return enrichedE;
-        }
-        return { ...e, position: pos };
-      })
-    );
-
-    // 3. Refiltres manuellement PAR DISTANCE autour du centre choisi
-    const filtered = enriched
-      .filter(e => isCompleteEntreprise(e))
-      .filter(e => {
-        const [lng2, lat2] = e.position;
-        // Haversine
-        function toRad(d) { return d * Math.PI / 180; }
-        const R = 6371;
-        const dLat = toRad(lat2 - lat);
-        const dLng = toRad(lng2 - lng);
-        const a = Math.sin(dLat / 2) ** 2 +
-                  Math.cos(toRad(lat)) * Math.cos(toRad(lat2)) *
-                  Math.sin(dLng / 2) ** 2;
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const d = R * c;
-        return d <= radius;
-      });
-
-    // 4. Filtre encore selon l’effectif, si demandé
-    let filteredFinal = filtered;
-    if (empRaw && employeeTrancheBounds[empRaw]) {
-      const [tMin, tMax] = employeeTrancheBounds[empRaw];
-      filteredFinal = filtered.filter(e => {
-        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
-        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
-      });
-    }
-    console.log('🔎 Résultats filtrés (post-géocodage):', filteredFinal.length, 'entrées');
-    res.json(filteredFinal);
+    res.json(rows);
   });
 });
+
 
 // --- PING ---
 app.get('/api/ping', (_req, res) => {
