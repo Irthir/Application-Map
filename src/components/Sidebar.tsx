@@ -67,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Recherche d'entreprise par nom/adresse/SIREN
   useEffect(() => {
-  if (!searchText) {
+  if (!searchText || searchText.length <= 3) {
     setSuggestions([]);
     return;
   }
