@@ -118,13 +118,19 @@ const App: React.FC = () => {
   /** Sélection depuis la recherche textuelle */
   const handleSelectEntreprise = (e: Entreprise) => {
     setCenter(e.position)
+    // on compare maintenant siren + address
     setSearchHistory(prev =>
-      prev.some(x => x.siren === e.siren) ? prev : [...prev, e]
+      prev.some(x => x.siren === e.siren && x.address === e.address)
+        ? prev
+        : [...prev, e]
     )
     setMapData(prev =>
-      prev.some(x => x.siren === e.siren) ? prev : [...prev, e]
+      prev.some(x => x.siren === e.siren && x.address === e.address)
+        ? prev
+        : [...prev, e]
     )
   }
+
 
   /** Classification depuis FloatingPanel (actuellement en recherche) */
   const handleSearchClassify = (

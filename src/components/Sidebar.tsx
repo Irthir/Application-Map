@@ -57,19 +57,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   radius, onRadiusChange, onFilterSearch
 }) => {
   const [filterLoading, setFilterLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(true); 
 
   // Recherche entreprises texte
   const [searchText, setSearchText] = useState('');
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
 
+
   // Recherche d'entreprise par nom/adresse/SIREN
   useEffect(() => {
-    if (!searchText) {
-      setSuggestions([]);
-      return;
-    }
-    setLoading(true);
+  if (!searchText) {
+    setSuggestions([]);
+    return;
+  }
+  setShowSuggestions(true); 
     fetch(`https://application-map.onrender.com/api/search?term=${encodeURIComponent(searchText)}`)
       .then(res => res.json())
       .then((res: Entreprise[]) => setSuggestions(Array.isArray(res) ? res : []))
@@ -84,6 +86,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleSearchSelect = (e: Entreprise) => {
     setSearchText('');
     setSuggestions([]);
+    setShowSuggestions(false); // ← cache la liste après sélection
     onSelectEntreprise(e);
   };
 
@@ -225,16 +228,35 @@ const Sidebar: React.FC<SidebarProps> = ({
           value={searchText} onChange={e => setSearchText(e.target.value)} />
         {searchText && <button className="clear-suggestions" onClick={() => setSearchText('')}>×</button>}
         {loading && <div className="loading">Chargement...</div>}
-        {suggestions.length > 0 && (
+        {suggestions.length > 0 && showSuggestions && (
+        <div className="suggestions-container" style={{ position: 'relative' }}>
+          <button
+            className="hide-suggestions"
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              background: 'transparent',
+              border: 'none',
+              fontSize: '1.2em',
+              cursor: 'pointer'
+            }}
+            onClick={() => setShowSuggestions(false)}
+          >×</button>
           <ul className="suggestions">
             {suggestions.map(s => (
-              <li key={s.siren} onClick={() => handleSearchSelect(s)}>
+              <li
+                key={`${s.siren}-${s.address}`}      // ← clé unique siren+adresse
+                onClick={() => handleSearchSelect(s)}
+              >
                 <div className="name">{s.name}</div>
                 <div className="address">{s.address}</div>
               </li>
             ))}
           </ul>
-        )}
+        </div>
+      )}
+
       </div>
 
       <h2>Rechercher par catégorie</h2>
