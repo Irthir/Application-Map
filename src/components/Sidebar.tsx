@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import nafTree from '../data/naf-tree.json';
 import sectionLabelsJson from '../data/naf-sections.json';
 const sectionLabels = sectionLabelsJson as Record<string, string>;
@@ -64,18 +64,59 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [suggestions, setSuggestions] = useState<Entreprise[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentAbort = useRef<AbortController | null>(null);
 
   // Recherche d'entreprise par nom/adresse/SIREN
   useEffect(() => {
-  if (!searchText || searchText.length <= 3) {
-    setSuggestions([]);
-    return;
-  }
-  setShowSuggestions(true); 
-    fetch(`https://application-map.onrender.com/api/search?term=${encodeURIComponent(searchText)}`)
-      .then(res => res.json())
-      .then((res: Entreprise[]) => setSuggestions(Array.isArray(res) ? res : []))
-      .finally(() => setLoading(false));
+    // Annule la requête précédente
+    if (currentAbort.current) {
+      currentAbort.current.abort();
+    }
+    // Vide le timer précédent
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    // Dès que <=3 caractères, on arrête tout
+    if (!searchText || searchText.length <= 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setLoading(false);
+      return;
+    }
+
+    // On planifie la vraie requête 300ms plus tard
+    setLoading(true);
+    debounceTimer.current = setTimeout(() => {
+      setShowSuggestions(true);
+      const controller = new AbortController();
+      currentAbort.current = controller;
+
+      fetch(
+        `https://application-map.onrender.com/api/search?term=${encodeURIComponent(searchText)}`,
+        { signal: controller.signal }
+      )
+        .then(res => res.json())
+        .then((res: Entreprise[]) => {
+          setSuggestions(Array.isArray(res) ? res : []);
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            console.error('Recherche auto-complétion échouée', err);
+          }
+        })
+        .finally(() => {
+          setLoading(false);
+          currentAbort.current = null;
+        });
+    }, 300);
+
+    // Nettoyage si le composant se démonte ou searchText change
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      if (currentAbort.current) currentAbort.current.abort();
+    };
   }, [searchText]);
 
   // Vide les suggestions dès qu'une recherche par filtre (activité/secteur) est lancée
