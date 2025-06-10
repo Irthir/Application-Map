@@ -1,4 +1,3 @@
-// server.js
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -37,8 +36,8 @@ async function ensureCoords(e) {
     return { ...e, position: geoCache.get(e.address) };
   }
   try {
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/`
-      + `${encodeURIComponent(e.address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/` +
+      `${encodeURIComponent(e.address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
     const resp = await fetch(url);
     if (resp.ok) {
       const js = await resp.json();
@@ -66,17 +65,16 @@ function isCompleteEntreprise(e) {
 function parsePosition(raw) {
   if (Array.isArray(raw)) return raw;
   const [lng, lat] = String(raw)
-    .replace(/[\[\]\s]/g, '')
+    .replace(/[[\]\s]/g, '')
     .split(',')
     .map(Number);
   if (isNaN(lng) || isNaN(lat)) {
-    // Log pour détecter des positions foireuses
     console.warn('Position invalide détectée:', raw);
   }
   return [lng, lat];
 }
 
-// --- ALL
+// --- ALL ---
 app.get('/api/all', async (_req, res) => {
   try {
     const sql = `
@@ -100,14 +98,12 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
-// --- SEARCH (texte)
+// --- SEARCH (texte) ---
 app.get('/api/search', async (req, res) => {
   const termRaw = String(req.query.term || '').trim().toLowerCase();
   if (!termRaw) return res.json([]);
 
-  // Clean et échappe les guillemets simples
   const safeTerm = termRaw.replace(/'/g, "''");
-
   const sql = `
     SELECT siren, name, codeNAF, employeesCategory, address, position
     FROM ${TABLE}
@@ -116,7 +112,6 @@ app.get('/api/search', async (req, res) => {
        OR siren LIKE '%${safeTerm}%'
     LIMIT 5
   `;
-
   console.log('SQL recherche:', sql);
 
   db.all(sql, async (err, rows) => {
@@ -132,8 +127,7 @@ app.get('/api/search', async (req, res) => {
   });
 });
 
-
-// --- MAPPING TRANCHE UI -> BORNES D'EFFECTIF
+// --- TRANCHE UI -> BORNES D'EFFECTIF ---
 const employeeTrancheBounds = {
   "1-10":    [1, 10],
   "11-50":   [11, 50],
@@ -142,25 +136,13 @@ const employeeTrancheBounds = {
   "501+":    [501, 100000]
 };
 const codeRanges = {
-  "00": [0, 0],
-  "01": [1, 2],
-  "02": [3, 5],
-  "03": [6, 9],
-  "11": [10, 19],
-  "12": [20, 49],
-  "21": [50, 99],
-  "22": [100, 199],
-  "31": [200, 249],
-  "32": [250, 499],
-  "41": [500, 999],
-  "42": [1000, 1999],
-  "51": [2000, 4999],
-  "52": [5000, 9999],
-  "53": [10000, 999999],
-  "NN": [null, null]
+  "00": [0, 0],    "01": [1, 2],    "02": [3, 5],    "03": [6, 9],
+  "11": [10, 19],  "12": [20, 49],  "21": [50, 99],  "22": [100, 199],
+  "31": [200, 249],"32": [250, 499],"41": [500, 999],"42": [1000, 1999],
+  "51": [2000, 4999],"52": [5000, 9999],"53": [10000, 999999],"NN": [null, null]
 };
 
-// --- SEARCH FILTERS (GET) version SQL-only
+// --- SEARCH FILTERS (GET) version SQL-only + parsing ---
 app.get('/api/search-filters', async (req, res) => {
   const nafRaw = String(req.query.naf || '').trim();
   const empRaw = String(req.query.employeesCategory || '').trim();
@@ -172,9 +154,6 @@ app.get('/api/search-filters', async (req, res) => {
     return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
   }
 
-  // On extrait longitude et latitude stockées dans le champ `position` (texte '[lng,lat]')
-  // puis on calcule la distance en km selon Haversine, on exclut le point par défaut et les NULL,
-  // et on ne garde que ceux dans le rayon.
   const sql = `
     WITH coords AS (
       SELECT
@@ -188,7 +167,6 @@ app.get('/api/search-filters', async (req, res) => {
     )
     SELECT DISTINCT
       siren, name, codeNAF, employeesCategory, address, position,
-      -- formule de Haversine :
       6371 * 2 * ASIN(SQRT(
         POWER(SIN(RADIANS(lat2 - ${lat}) / 2), 2) +
         COS(RADIANS(${lat})) * COS(RADIANS(lat2)) *
@@ -196,13 +174,6 @@ app.get('/api/search-filters', async (req, res) => {
       )) AS distance
     FROM coords
     WHERE distance <= ${radius}
-    ${empRaw && employeeTrancheBounds[empRaw] ? `
-      -- Filtre tranche d'effectif si demandé
-      AND (
-        CAST(split_part(employeesCategory, '', 1) AS INT) BETWEEN ${employeeTrancheBounds[empRaw][0]} 
-        AND ${employeeTrancheBounds[empRaw][1]}
-      )
-    ` : ''}
     ORDER BY distance
     LIMIT 3000;
   `;
@@ -212,30 +183,34 @@ app.get('/api/search-filters', async (req, res) => {
       console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
       return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
-    // On parse la position pour qu'elle devienne un vrai [lng, lat]
-    const formatted = rows.map(r => {
-      let pos;
+    // Parse position et filtre effectifs en JS
+    const parsed = rows.map(r => {
       try {
-        pos = JSON.parse(r.position);
-      } catch {
-        // Si pas un JSON valide, on ignore (ne renvoie pas l'objet)
-        return null;
-      }
-      // Si ce n'est pas un tableau à 2 nombres, on ignore
-      if (!Array.isArray(pos) || pos.length !== 2
-          || typeof pos[0] !== 'number' || typeof pos[1] !== 'number') {
-        return null;
-      }
-      return { ...r, position: pos };
+        const pos = JSON.parse(r.position);
+        if (
+          Array.isArray(pos) && pos.length === 2 &&
+          typeof pos[0] === 'number' && typeof pos[1] === 'number'
+        ) {
+          return { ...r, position: pos };
+        }
+      } catch {}
+      return null;
     }).filter(Boolean);
 
-    res.json(formatted);
-  });
+    let finalRows = parsed;
+    if (empRaw && employeeTrancheBounds[empRaw]) {
+      const [tMin, tMax] = employeeTrancheBounds[empRaw];
+      finalRows = parsed.filter(e => {
+        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
+        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
+      });
+    }
 
+    res.json(finalRows);
+  });
 });
 
-
-// --- SEARCH FILTERS (POST) version SQL-only
+// --- SEARCH FILTERS (POST) version SQL-only + parsing ---
 app.post('/api/search-filters', async (req, res) => {
   const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
   const empRaw = String(req.body.employeesCategory || '').trim();
@@ -248,7 +223,6 @@ app.post('/api/search-filters', async (req, res) => {
   }
 
   const inList = nafs.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
-
   const sql = `
     WITH coords AS (
       SELECT
@@ -269,12 +243,6 @@ app.post('/api/search-filters', async (req, res) => {
       )) AS distance
     FROM coords
     WHERE distance <= ${radius}
-    ${empRaw && employeeTrancheBounds[empRaw] ? `
-      AND (
-        CAST(split_part(employeesCategory, '', 1) AS INT) BETWEEN ${employeeTrancheBounds[empRaw][0]} 
-        AND ${employeeTrancheBounds[empRaw][1]}
-      )
-    ` : ''}
     ORDER BY distance
     LIMIT 3000;
   `;
@@ -284,28 +252,31 @@ app.post('/api/search-filters', async (req, res) => {
       console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
       return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
     }
-    // On parse la position pour qu'elle devienne un vrai [lng, lat]
-    const formatted = rows.map(r => {
-      let pos;
+    const parsed = rows.map(r => {
       try {
-        pos = JSON.parse(r.position);
-      } catch {
-        // Si pas un JSON valide, on ignore (ne renvoie pas l'objet)
-        return null;
-      }
-      // Si ce n'est pas un tableau à 2 nombres, on ignore
-      if (!Array.isArray(pos) || pos.length !== 2
-          || typeof pos[0] !== 'number' || typeof pos[1] !== 'number') {
-        return null;
-      }
-      return { ...r, position: pos };
+        const pos = JSON.parse(r.position);
+        if (
+          Array.isArray(pos) && pos.length === 2 &&
+          typeof pos[0] === 'number' && typeof pos[1] === 'number'
+        ) {
+          return { ...r, position: pos };
+        }
+      } catch {}
+      return null;
     }).filter(Boolean);
 
-    res.json(formatted);
+    let finalRows = parsed;
+    if (empRaw && employeeTrancheBounds[empRaw]) {
+      const [tMin, tMax] = employeeTrancheBounds[empRaw];
+      finalRows = parsed.filter(e => {
+        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
+        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
+      });
+    }
+
+    res.json(finalRows);
   });
-
 });
-
 
 // --- PING ---
 app.get('/api/ping', (_req, res) => {
