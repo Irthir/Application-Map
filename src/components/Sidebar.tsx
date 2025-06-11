@@ -19,11 +19,35 @@ interface SidebarProps {
   onFilterSearch: (filters: { nafCodes?: string[]; activityId?: string; employeesCategory: string; radius: number }) => Promise<void>;
 }
 
-const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+'];
+const employeeBuckets = ['1-10', '11-50', '51-200', '201-500', '501+', 'inconnu'];
 const normalizeText = (str: string) =>
   str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-const empCodeLabels: Record<string, string> = {
+// Conversion code interne → libellé humain
+function codeToHumanEmployees(code: string | undefined | null): string {
+  if (!code || code === "NN") return "inconnu";
+  if (["01", "02", "03", "00"].includes(code)) return "1-10";
+  if (["11", "12"].includes(code)) return "11-50";
+  if (["21", "22"].includes(code)) return "51-200";
+  if (["31", "32"].includes(code)) return "201-500";
+  if (["41", "42", "51", "52", "53"].includes(code)) return "501+";
+  return "inconnu";
+}
+
+// Conversion libellé humain → code interne (utilisé à l'import dans App.tsx)
+export function humanToCodeEmployees(human: string | undefined | null): string {
+  if (!human || human === "inconnu") return "NN";
+  switch (human) {
+    case "1-10": return "03";
+    case "11-50": return "12";
+    case "51-200": return "22";
+    case "201-500": return "32";
+    case "501+": return "41";
+    default: return "NN";
+  }
+}
+
+/*const empCodeLabels: Record<string, string> = {
   "00": "0",
   "01": "1-2",
   "02": "3-5",
@@ -43,7 +67,7 @@ const empCodeLabels: Record<string, string> = {
   "": "Donnée manquante",
   null: "Donnée manquante",
   undefined: "Donnée manquante"
-};
+};*/
 
 const nafSections: NafSection[] = (nafTree as any[]).map(section => {
   const match = section.label.match(/Section\s+(\d+)/);
@@ -57,7 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   radius, onRadiusChange, onFilterSearch
 }) => {
   const [filterLoading, setFilterLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true); 
+  const [showSuggestions, setShowSuggestions] = useState(true);
 
   // Recherche entreprises texte
   const [searchText, setSearchText] = useState('');
@@ -69,16 +93,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Recherche d'entreprise par nom/adresse/SIREN
   useEffect(() => {
-    // Annule la requête précédente
-    if (currentAbort.current) {
-      currentAbort.current.abort();
-    }
-    // Vide le timer précédent
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
+    if (currentAbort.current) currentAbort.current.abort();
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-    // Dès que <=3 caractères, on arrête tout
     if (!searchText || searchText.length <= 3) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -86,7 +103,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    // On planifie la vraie requête 300ms plus tard
     setLoading(true);
     debounceTimer.current = setTimeout(() => {
       setShowSuggestions(true);
@@ -110,16 +126,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           setLoading(false);
           currentAbort.current = null;
         });
-    }, 300);
+    }, 1000);
 
-    // Nettoyage si le composant se démonte ou searchText change
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       if (currentAbort.current) currentAbort.current.abort();
     };
   }, [searchText]);
 
-  // Vide les suggestions dès qu'une recherche par filtre (activité/secteur) est lancée
   useEffect(() => {
     if (filterLoading) setSuggestions([]);
   }, [filterLoading]);
@@ -127,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleSearchSelect = (e: Entreprise) => {
     setSearchText('');
     setSuggestions([]);
-    setShowSuggestions(false); // ← cache la liste après sélection
+    setShowSuggestions(false);
     onSelectEntreprise(e);
   };
 
@@ -192,6 +206,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       ...rows.map(e =>
         headers.map(h => {
           let val = (e as any)[h] ?? "";
+          // Conversion code interne → libellé pour le CSV
+          if (h === "employeesCategory") {
+            val = codeToHumanEmployees(val);
+          }
           if (typeof val === "string" && (val.includes(",") || val.includes("\n") || val.includes('"'))) {
             val = `"${val.replace(/"/g, '""')}"`;
           }
@@ -213,8 +231,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     const csv =
       "siren,name,address,type,codeNAF,employeesCategory\n" +
       '123456789,"Nom entreprise","1 rue de la Paix, 75000 Paris",client,1234Z,1-10\n' +
+      '987654321,"Entreprise Test","10 avenue de Lyon, 69000 Lyon",prospect,5610A,11-50\n' +
+      '555666777,"Boulangerie Dupont","5 rue des Lilas, 75012 Paris",client,1071C,51-200\n' +
+      '999888777,"Société Inconnue","12 rue inconnue, 75000 Paris",prospect,4321B,inconnu\n' +
       "# type : client ou prospect\n" +
-      "# employeesCategory : 1-10, 11-50, 51-200, 201-500, 501+\n" +
+      "# employeesCategory : 1-10, 11-50, 51-200, 201-500, 501+, inconnu\n" +
       "# codeNAF : optionnel (laisser vide si inconnu)\n";
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -235,7 +256,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleFilterClick = async () => {
     setFilterLoading(true);
     try {
-      // Vider suggestions lors d'une recherche par filtre
       setSuggestions([]);
       if (selectedSection && selectedSectionCodes.length) {
         await onFilterSearch({
@@ -254,12 +274,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       setFilterLoading(false);
     }
   };
-
-  // Label pour la section sélectionnée (affichage humain)
-  //const selectedSectionLabel =
-  //  selectedSection
-  //    ? (sectionLabels[selectedSection] || nafSections.find(s => s.id === selectedSection)?.label)
-  //    : "";
 
   return (
     <div className="sidebar" style={{ height: "100vh", overflowY: "auto" }}>
@@ -287,7 +301,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <ul className="suggestions">
             {suggestions.map(s => (
               <li
-                key={`${s.siren}-${s.address}`}      // ← clé unique siren+adresse
+                key={`${s.siren}-${s.address}`}
                 onClick={() => handleSearchSelect(s)}
               >
                 <div className="name">{s.name}</div>
@@ -315,7 +329,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <option value="">-- Toutes les sections --</option>
             {nafSections.map((s) => {
-              // Tente d'extraire le code section à partir du label (ex: "Section 01" -> "01")
               let code = '';
               const m = String(s.label).match(/Section\s+(\d+)/);
               if (m) code = m[1].padStart(2, '0');
@@ -359,7 +372,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               } --
             </option>
             {filteredDivs.map(div => {
-              // Pareil : essayer de trouver le code section à partir du label ou id
               let code = '';
               const m = String(div.label).match(/Section\s+(\d+)/);
               if (m) code = m[1].padStart(2, '0');
@@ -407,17 +419,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-
-
       <div className="user-list">
         <h2>Clients & Prospects</h2>
         {data.map(e => {
           const color = typeColor(e.type);
           const isClient = e.type === EntrepriseType.Client;
-          const catCode = e.employeesCategory;
-          const empCat = empCodeLabels.hasOwnProperty(catCode)
-            ? empCodeLabels[catCode]
-            : "Donnée manquante";
+          // Affichage du libellé humain, non du code interne
+          const empCat = codeToHumanEmployees(e.employeesCategory);
           return (
             <div key={e.siren} className="user-item" style={{ borderLeft: `4px solid ${color}` }}>
               <div className="user-info">
