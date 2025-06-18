@@ -21,7 +21,7 @@ try {
 const TABLE = 'entreprises';
 
 // --- MAPBOX ---
-const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN || 'pk.eyJ1IjoiamFjZTE5NSIsImEiOiJjbTc0aTR0aGcwYTJqMnFxeWdnN2N1NTRiIn0.UA9uEMwBO-JpQAkiutk_lg';
+const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN;
 if (!MAPBOX_TOKEN) {
   console.warn('⚠️ MAPBOX_TOKEN non défini – la géolocalisation par adresse tombera toujours sur Paris');
 }
