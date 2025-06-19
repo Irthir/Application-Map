@@ -4,6 +4,8 @@ import Map from './components/Map'
 import FloatingPanel from './components/FloatingPanel'
 import { Entreprise, EntrepriseType } from './type'
 import './index.css'
+import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 // Copie ici si pas exporté :
 // (Sinon, tu peux importer depuis Sidebar.tsx)
@@ -110,8 +112,10 @@ const App: React.FC = () => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (event) => {
+      let toastId: string | undefined;
       try {
         const csv = event.target?.result as string;
+        toastId = toast.loading("Importation en cours...");
         const imported = parseCsv(csv);
 
         // Géocode chaque entreprise par adresse
@@ -149,10 +153,13 @@ const App: React.FC = () => {
             const ids = new Set(okResults.map(e => e.siren));
             return [...prev.filter(e => !ids.has(e.siren)), ...okResults];
           });
+          toast.success(`Import terminé : ${okResults.length} entreprises importées`, { id: toastId });
         } else {
+          toast.error("Aucune entreprise importée n'a pu être géolocalisée.", { id: toastId });
           alert("Aucune entreprise importée n'a pu être géolocalisée.");
         }
       } catch (err) {
+        toast.error("Erreur lors de la lecture du fichier d'import.", { id: toastId });
         alert("Erreur lors de la lecture du fichier d'import.");
       }
     };
@@ -220,8 +227,11 @@ const App: React.FC = () => {
     employeesCategory: string
     radius: number
   }) => {
+    let toastId: string | undefined;
     try {
       setFilterRadius(filters.radius);
+
+      toastId = toast.loading('Recherche en cours...');
 
       let rows: Entreprise[];
       if (filters.nafCodes && filters.nafCodes.length) {
@@ -258,14 +268,21 @@ const App: React.FC = () => {
 
       setSearchHistory(filteredRows);
       setMapData([...userData, ...filteredRows]);
+      if (filteredRows.length > 0) {
+      toast.success(`Recherche terminée : ${filteredRows.length} résultat(s) trouvé(s)`, { id: toastId });
+      } else {
+        toast.error("Aucun résultat trouvé.", { id: toastId });
+      }
       console.log('Recherche par filtres réussie', filteredRows);
     } catch (err) {
+      toast.error('Recherche échouée.', { id: toastId });
       console.error('Recherche par filtres échouée :', err);
     }
   }
 
   const handleSearchSimilar = async (e: Entreprise) => {
     setCenter(e.position)
+    toast.loading("Recherche de similaires en cours...", { id: "similar" });
     await handleFilterSearch({
       activityId: e.codeNAF,
       employeesCategory: "", // vide = toutes tailles, adapte si besoin
@@ -275,6 +292,7 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
+      <Toaster />
       <Sidebar
         data={userData}
         onSelectEntreprise={handleSelectEntreprise}

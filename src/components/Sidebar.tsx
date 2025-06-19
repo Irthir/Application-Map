@@ -3,6 +3,7 @@ import nafTree from '../data/naf-tree.json';
 import sectionLabelsJson from '../data/naf-sections.json';
 const sectionLabels = sectionLabelsJson as Record<string, string>;
 import { Entreprise, EntrepriseType } from '../type';
+import toast from 'react-hot-toast';
 
 interface Activity { id: string; label: string; }
 interface Division { id: string; label: string; children: Activity[]; }
@@ -104,6 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
 
     setLoading(true);
+    toast.loading("Recherche en cours...", { id: "autocomplete" });
     debounceTimer.current = setTimeout(() => {
       setShowSuggestions(true);
       const controller = new AbortController();
@@ -116,9 +118,14 @@ const Sidebar: React.FC<SidebarProps> = ({
         .then(res => res.json())
         .then((res: Entreprise[]) => {
           setSuggestions(Array.isArray(res) ? res : []);
+          if (Array.isArray(res) && res.length > 0)
+            toast.success(`Recherche terminée : ${res.length} résultat(s)`, { id: "autocomplete" });
+          else
+            toast.error("Aucun résultat trouvé.", { id: "autocomplete" });
         })
         .catch(err => {
           if (err.name !== 'AbortError') {
+            toast.error('Erreur lors de la recherche.', { id: "autocomplete" });
             console.error('Recherche auto-complétion échouée', err);
           }
         })
