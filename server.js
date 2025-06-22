@@ -7,14 +7,16 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const MINI_PC_API = 'https://hideously-vocal-mudfish.ngrok-free.app';
 
-app.use(cors());
+app.use(cors({
+  origin: 'https://irthir.github.io'
+}));
 app.use(express.json());
 
-// --- MAPBOX ---
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN;
 if (!MAPBOX_TOKEN) {
   console.warn('⚠️ MAPBOX_TOKEN non défini – géolocalisation par défaut à Paris');
 }
+
 const geoCache = new Map();
 
 function parsePosition(raw) {
@@ -31,12 +33,12 @@ function parsePosition(raw) {
 
 async function ensureCoords(e) {
   const [lng0, lat0] = e.position || [null, null];
-  if (!(lng0 === 2.3522 && lat0 === 48.8566) || !e.address) {
-    return e;
-  }
+  if (!(lng0 === 2.3522 && lat0 === 48.8566) || !e.address) return e;
+
   if (geoCache.has(e.address)) {
     return { ...e, position: geoCache.get(e.address) };
   }
+
   try {
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/` +
       `${encodeURIComponent(e.address)}.json?access_token=${MAPBOX_TOKEN}&limit=1`;
@@ -52,17 +54,29 @@ async function ensureCoords(e) {
   } catch (err) {
     console.warn('Geocoding failed for', e.address, err.message);
   }
+
   return e;
+}
+
+// ✅ Fonction fetch avec timeout intégré (120s)
+async function fetchWithTimeout(url, options = {}, timeout = 120000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
 }
 
 // --- ALL ENTREPRISES
 app.get('/api/all', async (_req, res) => {
   try {
-    const resp = await fetch(`${MINI_PC_API}/entreprises`);
+    const resp = await fetchWithTimeout(`${MINI_PC_API}/entreprises`);
     const raw = await resp.json();
     const enriched = await Promise.all(
       raw.map(e => ({ ...e, position: parsePosition(e.position) }))
-          .map(ensureCoords)
+         .map(ensureCoords)
     );
     res.json(enriched);
   } catch (err) {
@@ -77,7 +91,7 @@ app.get('/api/search', async (req, res) => {
   if (!term) return res.json([]);
 
   try {
-    const resp = await fetch(`${MINI_PC_API}/entreprises/search?term=${encodeURIComponent(term)}`);
+    const resp = await fetchWithTimeout(`${MINI_PC_API}/entreprises/search?term=${encodeURIComponent(term)}`);
     const raw = await resp.json();
     const enriched = await Promise.all(
       raw.map(e => ({ ...e, position: parsePosition(e.position) }))
@@ -94,7 +108,7 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/search-filters', async (req, res) => {
   const qs = new URLSearchParams(req.query).toString();
   try {
-    const resp = await fetch(`${MINI_PC_API}/entreprises/filter?${qs}`);
+    const resp = await fetchWithTimeout(`${MINI_PC_API}/entreprises/filter?${qs}`);
     const data = await resp.json();
     res.json(data);
   } catch (err) {
@@ -106,7 +120,7 @@ app.get('/api/search-filters', async (req, res) => {
 // --- SEARCH FILTERS (POST)
 app.post('/api/search-filters', async (req, res) => {
   try {
-    const resp = await fetch(`${MINI_PC_API}/entreprises/filter`, {
+    const resp = await fetchWithTimeout(`${MINI_PC_API}/entreprises/filter`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body)
@@ -127,7 +141,7 @@ app.get('/api/ping', (_req, res) => {
 // --- HEALTH CHECK du mini-PC
 app.get('/api/health', async (_req, res) => {
   try {
-    const resp = await fetch(`${MINI_PC_API}/health`);
+    const resp = await fetchWithTimeout(`${MINI_PC_API}/health`);
     const json = await resp.json();
     res.json({ ...json, status: 'ok' });
   } catch (err) {
