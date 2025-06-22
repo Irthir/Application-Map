@@ -58,7 +58,7 @@ async function ensureCoords(e) {
   return e;
 }
 
-// ✅ Fonction fetch avec timeout intégré (120s)
+// --- Fonction utilitaire avec timeout (par défaut 120s)
 async function fetchWithTimeout(url, options = {}, timeout = 120000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
@@ -69,7 +69,7 @@ async function fetchWithTimeout(url, options = {}, timeout = 120000) {
   }
 }
 
-// --- ALL ENTREPRISES
+// --- /api/all
 app.get('/api/all', async (_req, res) => {
   try {
     const resp = await fetchWithTimeout(`${MINI_PC_API}/entreprises`);
@@ -85,7 +85,7 @@ app.get('/api/all', async (_req, res) => {
   }
 });
 
-// --- SEARCH
+// --- /api/search
 app.get('/api/search', async (req, res) => {
   const term = String(req.query.term || '').trim();
   if (!term) return res.json([]);
@@ -104,7 +104,7 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// --- SEARCH FILTERS (GET)
+// --- /api/search-filters GET
 app.get('/api/search-filters', async (req, res) => {
   const qs = new URLSearchParams(req.query).toString();
   try {
@@ -117,7 +117,7 @@ app.get('/api/search-filters', async (req, res) => {
   }
 });
 
-// --- SEARCH FILTERS (POST)
+// --- /api/search-filters POST
 app.post('/api/search-filters', async (req, res) => {
   try {
     const resp = await fetchWithTimeout(`${MINI_PC_API}/entreprises/filter`, {
@@ -133,12 +133,12 @@ app.post('/api/search-filters', async (req, res) => {
   }
 });
 
-// --- PING
+// --- /api/ping
 app.get('/api/ping', (_req, res) => {
   res.json({ pong: true, ts: Date.now() });
 });
 
-// --- HEALTH CHECK du mini-PC
+// --- /api/health
 app.get('/api/health', async (_req, res) => {
   try {
     const resp = await fetchWithTimeout(`${MINI_PC_API}/health`);
