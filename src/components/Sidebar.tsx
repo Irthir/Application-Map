@@ -410,7 +410,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <input
             type="range"
             min={5}
-            max={50}
+            max={30}
             value={radius}
             onChange={e => onRadiusChange(+e.target.value)}
           />

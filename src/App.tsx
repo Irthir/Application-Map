@@ -57,7 +57,7 @@ const App: React.FC = () => {
   const [searchHistory, setSearchHistory] = useState<Entreprise[]>([])
   const [userData, setUserData] = useState<Entreprise[]>([])
   const [center, setCenter] = useState<[number, number]>([2.3522, 48.8566])
-  const [filterRadius, setFilterRadius] = useState<number>(20)
+  const [filterRadius, setFilterRadius] = useState<number>(10)
   
   useEffect(() => {
     fetch("https://application-map.onrender.com/api/ping")
