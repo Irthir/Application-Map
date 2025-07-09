@@ -1,4 +1,4 @@
-// server.js optimisé
+// server.js optimisé complet
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
@@ -11,6 +11,18 @@ const PORT = process.env.PORT || 4000;
 
 app.use(cors());
 app.use(express.json());
+
+// --- Logger temps réponse ---
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    if (duration > 500) {
+      console.warn(`⚠️ Requête lente : ${req.method} ${req.originalUrl} - ${duration}ms`);
+    }
+  });
+  next();
+});
 
 // --- BDD ---
 let db;
@@ -104,26 +116,40 @@ app.get('/api/all', async (req, res) => {
   });
 });
 
-// --- Autres endpoints (search, filters, etc.) restent identiques sauf si enrichissement nécessaire ---
+// --- SEARCH texte ---
+app.get('/api/search', async (req, res) => {
+  const termRaw = String(req.query.term || '').trim().toLowerCase();
+  if (!termRaw) return res.json([]);
+
+  const safeTerm = termRaw.replace(/'/g, "''");
+  const sql = `
+    SELECT siren, name, codeNAF, employeesCategory, address, position
+    FROM ${TABLE}
+    WHERE LOWER(name) LIKE '%${safeTerm}%'
+       OR LOWER(address) LIKE '%${safeTerm}%'
+       OR siren LIKE '%${safeTerm}%'
+    LIMIT 3
+  `;
+
+  db.all(sql, async (err, rows) => {
+    if (err) {
+      console.error('DuckDB /search error:', err, '\nSQL:', sql);
+      return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
+    }
+    const parsed = rows
+      .map(e => ({ ...e, position: parsePosition(e.position) }))
+      .filter(isCompleteEntreprise);
+    const enriched = await Promise.all(parsed.map(ensureCoords));
+    res.json(enriched);
+  });
+});
 
 // --- PING ---
 app.get('/api/ping', (_req, res) => {
   res.json({ pong: true, ts: Date.now() });
 });
 
-// --- Logger temps réponse ---
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    if (duration > 500) {
-      console.warn(`⚠️ Requête lente : ${req.method} ${req.originalUrl} - ${duration}ms`);
-    }
-  });
-  next();
-});
-
-// --- Launch server ---
+// --- Start server ---
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
 });
