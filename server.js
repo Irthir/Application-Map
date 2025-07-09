@@ -93,6 +93,21 @@ function parsePosition(raw) {
   return [2.3522, 48.8566];
 }
 
+// --- Effectif mappings ---
+const employeeTrancheBounds = {
+  "1-10":    [1, 10],
+  "11-50":   [11, 50],
+  "51-200":  [51, 200],
+  "201-500": [201, 500],
+  "501+":    [501, 100000]
+};
+const codeRanges = {
+  "00": [0, 0],    "01": [1, 2],    "02": [3, 5],    "03": [6, 9],
+  "11": [10, 19],  "12": [20, 49],  "21": [50, 99],  "22": [100, 199],
+  "31": [200, 249],"32": [250, 499],"41": [500, 999],"42": [1000, 1999],
+  "51": [2000, 4999],"52": [5000, 9999],"53": [10000, 999999],"NN": [null, null]
+};
+
 // --- GET /api/all ---
 app.get('/api/all', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 500);
@@ -128,7 +143,7 @@ app.get('/api/search', async (req, res) => {
     WHERE LOWER(name) LIKE '%${safeTerm}%'
        OR LOWER(address) LIKE '%${safeTerm}%'
        OR siren LIKE '%${safeTerm}%'
-    LIMIT 3
+    LIMIT 5
   `;
 
   db.all(sql, async (err, rows) => {
@@ -141,6 +156,127 @@ app.get('/api/search', async (req, res) => {
       .filter(isCompleteEntreprise);
     const enriched = await Promise.all(parsed.map(ensureCoords));
     res.json(enriched);
+  });
+});
+
+// --- SEARCH FILTERS GET ---
+app.get('/api/search-filters', (req, res) => {
+  const nafRaw = String(req.query.naf || '').trim();
+  const empRaw = String(req.query.employeesCategory || '').trim();
+  const radius = Number(req.query.radius || 20);
+  const lng = Number(req.query.lng);
+  const lat = Number(req.query.lat);
+
+  if (!nafRaw || isNaN(radius) || radius <= 0 || isNaN(lng) || isNaN(lat)) {
+    return res.status(400).json({ error: 'naf, lng, lat, radius sont requis et valides' });
+  }
+
+  const sql = `
+    WITH coords AS (
+      SELECT siren, name, codeNAF, employeesCategory, address, position,
+        CAST(split_part(trim(both '[]' FROM position), ',', 1) AS DOUBLE) AS lng2,
+        CAST(split_part(trim(both '[]' FROM position), ',', 2) AS DOUBLE) AS lat2
+      FROM ${TABLE}
+      WHERE position IS NOT NULL AND position <> '[2.3522,48.8566]' AND codeNAF LIKE '${nafRaw}%'
+    )
+    SELECT DISTINCT siren, name, codeNAF, employeesCategory, address, position,
+      6371 * 2 * ASIN(SQRT(
+        POWER(SIN(RADIANS(lat2 - ${lat}) / 2), 2) +
+        COS(RADIANS(${lat})) * COS(RADIANS(lat2)) *
+        POWER(SIN(RADIANS(lng2 - ${lng}) / 2), 2)
+      )) AS distance
+    FROM coords
+    WHERE distance <= ${radius}
+    ORDER BY distance
+    LIMIT 50;
+  `;
+
+  db.all(sql, (err, rows) => {
+    if (err) {
+      console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
+      return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
+    }
+    const parsed = rows.map(r => {
+      try {
+        const pos = JSON.parse(r.position);
+        if (Array.isArray(pos) && pos.length === 2 && typeof pos[0] === 'number' && typeof pos[1] === 'number') {
+          return { ...r, position: pos };
+        }
+      } catch {}
+      return null;
+    }).filter(Boolean);
+
+    let finalRows = parsed;
+    if (empRaw && employeeTrancheBounds[empRaw]) {
+      const [tMin, tMax] = employeeTrancheBounds[empRaw];
+      finalRows = parsed.filter(e => {
+        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
+        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
+      });
+    }
+
+    res.json(finalRows);
+  });
+});
+
+// --- SEARCH FILTERS POST ---
+app.post('/api/search-filters', (req, res) => {
+  const nafs = Array.isArray(req.body.nafs) ? req.body.nafs.filter(Boolean) : [];
+  const empRaw = String(req.body.employeesCategory || '').trim();
+  const radius = Number(req.body.radius || 20);
+  const lng = Number(req.body.lng);
+  const lat = Number(req.body.lat);
+
+  if (!nafs.length || isNaN(radius) || radius <= 0 || isNaN(lng) || isNaN(lat)) {
+    return res.status(400).json({ error: 'nafs, lng, lat, radius sont requis et valides' });
+  }
+
+  const inList = nafs.map(n => `'${n.replace(/'/g, "''")}'`).join(',');
+  const sql = `
+    WITH coords AS (
+      SELECT siren, name, codeNAF, employeesCategory, address, position,
+        CAST(split_part(trim(both '[]' FROM position), ',', 1) AS DOUBLE) AS lng2,
+        CAST(split_part(trim(both '[]' FROM position), ',', 2) AS DOUBLE) AS lat2
+      FROM ${TABLE}
+      WHERE position IS NOT NULL AND position <> '[2.3522,48.8566]' AND codeNAF IN (${inList})
+    )
+    SELECT DISTINCT siren, name, codeNAF, employeesCategory, address, position,
+      6371 * 2 * ASIN(SQRT(
+        POWER(SIN(RADIANS(lat2 - ${lat}) / 2), 2) +
+        COS(RADIANS(${lat})) * COS(RADIANS(lat2)) *
+        POWER(SIN(RADIANS(lng2 - ${lng}) / 2), 2)
+      )) AS distance
+    FROM coords
+    WHERE distance <= ${radius}
+    ORDER BY distance
+    LIMIT 50;
+  `;
+
+  db.all(sql, (err, rows) => {
+    if (err) {
+      console.error('DuckDB /search-filters SQL error:', err, '\nSQL:', sql);
+      return res.status(500).json({ error: 'Erreur interne DuckDB', detail: err.message });
+    }
+    const parsed = rows.map(r => {
+      try {
+        const pos = JSON.parse(r.position);
+        if (Array.isArray(pos) && pos.length === 2 && typeof pos[0] === 'number' && typeof pos[1] === 'number') {
+          return { ...r, position: pos };
+        }
+      } catch {}
+      return null;
+    }).filter(Boolean);
+
+    let finalRows = parsed;
+    if (empRaw && employeeTrancheBounds[empRaw]) {
+      const [tMin, tMax] = employeeTrancheBounds[empRaw];
+      finalRows = parsed.filter(e => {
+        const [catMin, catMax] = codeRanges[e.employeesCategory] || [null, null];
+        return catMin !== null && catMax !== null && catMax >= tMin && catMin <= tMax;
+      });
+    }
+
+    res.json(finalRows);
   });
 });
 
