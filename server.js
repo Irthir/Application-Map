@@ -110,7 +110,7 @@ app.get('/api/search', async (req, res) => {
     WHERE LOWER(name) LIKE '%${safeTerm}%'
        OR LOWER(address) LIKE '%${safeTerm}%'
        OR siren LIKE '%${safeTerm}%'
-    LIMIT 5
+    LIMIT 3
   `;
   console.log('SQL recherche:', sql);
 
