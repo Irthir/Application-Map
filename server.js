@@ -175,7 +175,7 @@ app.get('/api/search-filters', async (req, res) => {
     FROM coords
     WHERE distance <= ${radius}
     ORDER BY distance
-    LIMIT 3000;
+    LIMIT 50;
   `;
 
   db.all(sql, (err, rows) => {
@@ -244,7 +244,7 @@ app.post('/api/search-filters', async (req, res) => {
     FROM coords
     WHERE distance <= ${radius}
     ORDER BY distance
-    LIMIT 3000;
+    LIMIT 50;
   `;
 
   db.all(sql, (err, rows) => {
